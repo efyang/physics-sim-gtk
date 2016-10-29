@@ -1,0 +1,12 @@
+[package]
+authors = ["Edward Yang <edward.yang6771@gmail.com>"]
+name = "physics-sim-gtk"
+version = "0.1.0"
+
+[dependencies]
+cairo = "0.0.4"
+gdk = "0.5.0"
+gtk = "0.1.0"
+
+[dependencies.physics-sim]
+git = "https://github.com/efyang/physics-sim"
