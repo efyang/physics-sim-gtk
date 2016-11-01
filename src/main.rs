@@ -1,10 +1,14 @@
+#![feature(conservative_impl_trait)]
+#![allow(dead_code)]
 extern crate gtk;
 extern crate cairo;
 extern crate physics_sim;
+extern crate time;
 
 mod uistate;
 mod editstate;
 mod ui;
+mod sharedstate;
 
 use ui::{Ui, IterationResult};
 
