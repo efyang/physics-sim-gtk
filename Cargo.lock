@@ -322,7 +322,7 @@ dependencies = [
 [[package]]
 name = "physics-sim"
 version = "0.1.0"
-source = "git+https://github.com/efyang/physics-sim#f41e35ee9d62e4d36b0be12ed79f95d8a4e93f0b"
+source = "git+https://github.com/efyang/physics-sim#f84b7fc70ee2f545108c2745a8c5169e8875275d"
 
 [[package]]
 name = "pkg-config"
