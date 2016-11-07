@@ -1,6 +1,7 @@
 use std::rc::Rc;
-use std::cell::{RefCell, RefMut};
+use std::cell::{RefCell, RefMut, Ref};
 
+#[derive(Clone)]
 pub struct SharedState<T> {
     inner: Rc<RefCell<T>>,
 }
@@ -12,15 +13,15 @@ impl<T> SharedState<T> {
         }
     }
 
-    pub fn get_state(&self) -> T {
-        unimplemented!()
+    pub fn get_state(&self) -> Ref<T> {
+        self.inner.borrow()
     }
 
-    pub fn get_state_mut(&mut self) -> RefMut<T> {
+    pub fn get_state_mut(&self) -> RefMut<T> {
         self.inner.borrow_mut()
     }
 
     pub fn set_state(&self, new_state: T) {
-        unimplemented!()
+        *self.inner.borrow_mut() = new_state;
     }
 }
