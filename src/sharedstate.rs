@@ -1,7 +1,6 @@
 use std::rc::Rc;
 use std::cell::{RefCell, RefMut, Ref};
 
-#[derive(Clone)]
 pub struct SharedState<T> {
     inner: Rc<RefCell<T>>,
 }
@@ -23,5 +22,13 @@ impl<T> SharedState<T> {
 
     pub fn set_state(&self, new_state: T) {
         *self.inner.borrow_mut() = new_state;
+    }
+}
+
+impl<T> Clone for SharedState<T> {
+    fn clone(&self) -> SharedState<T> {
+        SharedState {
+            inner: self.inner.clone()
+        }
     }
 }

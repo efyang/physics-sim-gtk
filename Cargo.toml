@@ -10,4 +10,5 @@ gtk = "0.1.0"
 time = "0.1.35"
 
 [dependencies.physics-sim]
-git = "https://github.com/efyang/physics-sim"
+#git = "https://github.com/efyang/physics-sim"
+path = "../physics-sim"

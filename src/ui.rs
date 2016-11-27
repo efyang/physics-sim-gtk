@@ -1,10 +1,14 @@
 use gtk::prelude::*;
 use gtk::{self, Window, WindowType, DrawingArea, Orientation};
 use cairo::prelude::*;
-use physics_sim::Universe;
-use super::uistate::UiState;
+use coloruniverse::ColorUniverse;
+use uistate::UiState;
 use sharedstate::SharedState;
-use super::fpsinfo::FpsInfo;
+use fpsinfo::FpsInfo;
+use drawinfo::DrawInfo;
+use drawobject::DrawAll;
+
+const LOOP_LIMIT: usize = 200;
 
 pub enum IterationResult {
     Ok,
@@ -15,8 +19,10 @@ pub enum IterationResult {
 pub struct Ui {
     fpsinfo: SharedState<FpsInfo>,
     state: SharedState<UiState>,
-    drawarea: DrawingArea,
-    universe: SharedState<Universe>,
+    drawarea: SharedState<DrawingArea>,
+    universe: SharedState<ColorUniverse>,
+    drawinfo: SharedState<DrawInfo>,
+    testvar: SharedState<f64>,
 }
 
 impl Ui {
@@ -32,35 +38,83 @@ impl Ui {
         window.add(&mainsplit);
         window.show_all();
 
-        Ui {
+        let this = Ui {
             fpsinfo: SharedState::new(FpsInfo::default()),
             state: SharedState::new(UiState::default()),
-            drawarea: drawarea,
-            universe: SharedState::new(Universe::default()),
-        }
+            drawarea: SharedState::new(drawarea),
+            universe: SharedState::new(ColorUniverse::default()),
+            drawinfo: SharedState::new(DrawInfo::default()),
+            testvar: SharedState::new(0f64),
+        };
+        this.setup_draw_callbacks();
+        this.setup_window_callbacks(&window);
+        this
     }
 
-    pub fn setup_callbacks(&self) {
-        let mut fpsinfo = self.fpsinfo.clone();
-        self.drawarea.connect_draw(move |drawarea, ctxt| {
+    fn setup_draw_callbacks(&self) {
+        let fpsinfo = self.fpsinfo.clone();
+        let universe = self.universe.clone();
+        let drawarea = self.drawarea.get_state();
+        let drawinfo = self.drawinfo.clone();
+        let testvar = self.testvar.clone();
+        drawarea.set_size_request(800, 800);
+        drawarea.connect_draw(move |drawarea, ctxt| {
+            // apply the drawing info
+            drawinfo.get_state().apply(ctxt);
             // draw everything
+            universe.get_state().draw_all(ctxt);
 
+            // NOTE: placeholder
+            ctxt.set_operator(::cairo::Operator::Source);
+            ctxt.set_source_rgb(0.0, 0.5, 0.0);
+            ctxt.paint();
 
+            ctxt.set_source_rgb(0.5, 0.5, 0.5);
+            ctxt.rectangle(*testvar.get_state(), 400., 50., 50.);
+            ctxt.fill();
+            *testvar.get_state_mut() += 1.;
 
             // get ready for next fps update
             fpsinfo.get_state_mut().update_time();
-            unimplemented!();
             Inhibit(false)
         });
     }
 
+    fn setup_window_callbacks(&self, window: &Window) {
+        window.connect_delete_event(|_, _| {
+            gtk::main_quit();
+            Inhibit(false)
+        });
+
+        let drawinfo = self.drawinfo.clone();
+        let drawarea = self.drawarea.clone();
+        window.connect_check_resize(move |_| {
+            // set the new size
+            let drawarea = drawarea.get_state();
+            let (x_size, y_size) = drawarea.get_size_request();
+            drawinfo.get_state_mut().set_size(x_size as f64, y_size as f64);
+            drawarea.queue_draw();
+        });
+    }
+
+    //fn setup_button_callbacks(buttons: ) {
+
+    //}
+
     pub fn iterate(&mut self) -> IterationResult {
         if self.fpsinfo.get_state().should_redraw() {
-            self.drawarea.queue_draw();
+            println!("next frame");
+            self.drawarea.get_state().queue_draw();
         }
 
-        gtk::main_iteration();
-        unimplemented!();
+        // check the updater output ring buffer
+       
+        // maybe just switch to gtk::main and idle_add
+        let mut loops_done = 0;
+        while gtk::events_pending() && loops_done < LOOP_LIMIT {
+            gtk::main_iteration();
+            loops_done += 1;
+        }
         IterationResult::Ok
     }
 }
@@ -76,9 +130,5 @@ fn default_window() -> Window {
     let window = Window::new(WindowType::Toplevel);
     window.set_title("Physics Simulator");
     window.set_default_size(800, 800);
-    window.connect_delete_event(|_, _| {
-        gtk::main_quit();
-        Inhibit(false)
-    });
     window
 }

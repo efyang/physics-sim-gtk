@@ -6,3 +6,14 @@ macro_rules! color_func {
 }
 
 pub struct Color(f64, f64, f64);
+
+pub enum ObjectColor {
+    UserSet(Color),
+    FromMass,
+}
+
+impl Into<ObjectColor> for Color {
+    fn into(self) -> ObjectColor {
+        ObjectColor::UserSet(self)
+    }
+}
