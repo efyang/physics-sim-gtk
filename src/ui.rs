@@ -8,8 +8,6 @@ use fpsinfo::FpsInfo;
 use drawinfo::DrawInfo;
 use drawobject::DrawAll;
 
-const LOOP_LIMIT: usize = 200;
-
 pub enum IterationResult {
     Ok,
     Finished,
@@ -27,8 +25,6 @@ pub struct Ui {
 
 impl Ui {
     pub fn initialize() -> Ui {
-        initialize_gtk();
-
         let window = default_window();
         let mainsplit = gtk::Box::new(Orientation::Vertical, 10);
         let drawarea = DrawingArea::new();
@@ -108,23 +104,12 @@ impl Ui {
         }
 
         // check the updater output ring buffer
+        
        
-        // maybe just switch to gtk::main and idle_add
-        let mut loops_done = 0;
-        while gtk::events_pending() && loops_done < LOOP_LIMIT {
-            gtk::main_iteration();
-            loops_done += 1;
-        }
         IterationResult::Ok
     }
 }
 
-fn initialize_gtk() {
-    if gtk::init().is_err() {
-        println!("Failed to initialize GTK.");
-        return;
-    }
-}
 
 fn default_window() -> Window {
     let window = Window::new(WindowType::Toplevel);
