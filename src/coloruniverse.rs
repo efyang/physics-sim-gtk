@@ -1,6 +1,7 @@
 use physics_sim::{Universe, Object};
 use super::color::ObjectColor;
 
+#[derive(Clone)]
 pub struct ColorUniverse {
     universe: Universe,
     colors: Vec<ObjectColor>

@@ -5,8 +5,10 @@ macro_rules! color_func {
     }
 }
 
+#[derive(Clone)]
 pub struct Color(f64, f64, f64);
 
+#[derive(Clone)]
 pub enum ObjectColor {
     UserSet(Color),
     FromMass,
