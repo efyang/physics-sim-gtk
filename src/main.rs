@@ -15,9 +15,11 @@ mod drawobject;
 mod color;
 mod updater;
 mod coloruniverse;
+mod iteration_result;
 
 use gtk::prelude::*;
-use ui::{Ui, IterationResult};
+use ui::Ui;
+use iteration_result::IterationResult;
 
 fn main() {
     initialize_gtk();

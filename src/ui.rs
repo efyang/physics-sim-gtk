@@ -7,12 +7,9 @@ use sharedstate::SharedState;
 use fpsinfo::FpsInfo;
 use drawinfo::DrawInfo;
 use drawobject::DrawAll;
-
-pub enum IterationResult {
-    Ok,
-    Finished,
-    Error(String),
-}
+use std::sync::mpsc::{Sender, Receiver};
+use updater::{UpdateSettings, UpdaterCommand, Updater};
+use iteration_result::IterationResult;
 
 pub struct Ui {
     fpsinfo: SharedState<FpsInfo>,
@@ -21,10 +18,15 @@ pub struct Ui {
     universe: SharedState<ColorUniverse>,
     drawinfo: SharedState<DrawInfo>,
     testvar: SharedState<f64>,
+    universe_recv: SharedState<Receiver<ColorUniverse>>,
+    update_settings: SharedState<UpdateSettings>,
+    update_command_send: SharedState<Sender<UpdaterCommand>>,
 }
 
 impl Ui {
     pub fn initialize() -> Ui {
+        let (mut updater, universe_recv, update_command_send) =
+            Updater::new(ColorUniverse::default());
         let window = default_window();
         let mainsplit = gtk::Box::new(Orientation::Vertical, 10);
         let drawarea = DrawingArea::new();
@@ -41,9 +43,24 @@ impl Ui {
             universe: SharedState::new(ColorUniverse::default()),
             drawinfo: SharedState::new(DrawInfo::default()),
             testvar: SharedState::new(0f64),
+            universe_recv: SharedState::new(universe_recv),
+            update_settings: SharedState::new(UpdateSettings::default()),
+            update_command_send: SharedState::new(update_command_send),
         };
         this.setup_draw_callbacks();
         this.setup_window_callbacks(&window);
+        ::std::thread::spawn(move || {
+            loop {
+                match updater.iterate() {
+                    IterationResult::Error(e) => {
+                        println!("{}", e);
+                        break;
+                    }
+                    IterationResult::Finished => break,
+                    IterationResult::Ok => {}
+                }
+            }
+        });
         this
     }
 
@@ -93,9 +110,9 @@ impl Ui {
         });
     }
 
-    //fn setup_button_callbacks(buttons: ) {
+    // fn setup_button_callbacks(buttons: ) {
 
-    //}
+    // }
 
     pub fn iterate(&mut self) -> IterationResult {
         if self.fpsinfo.get_state().should_redraw() {
@@ -103,9 +120,15 @@ impl Ui {
             self.drawarea.get_state().queue_draw();
         }
 
-        // check the updater output ring buffer
-        
-       
+        // check the updater output
+        match self.universe_recv.get_state().recv() {
+            Ok(new_universe) => *self.universe.get_state_mut() = new_universe,
+            Err(e) => {
+                // should never happen
+                return IterationResult::Error(format!("{}", e));
+            }
+        }
+
         IterationResult::Ok
     }
 }

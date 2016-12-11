@@ -1,5 +1,6 @@
-use std::sync::mpsc::{Sender, Receiver};
+use std::sync::mpsc::{channel, Sender, Receiver, TryRecvError};
 use coloruniverse::ColorUniverse;
+use iteration_result::IterationResult;
 
 // if UI is finished first, then first send kill signal to updater, then this should automatically
 // be stopped/dropped anyways
@@ -7,36 +8,57 @@ use coloruniverse::ColorUniverse;
 // add should_update variable or receiver which should be false when uistate is edit
 
 pub struct Updater {
-    update_output: Sender<ColorUniverse>,
-    update_settings_recv: Receiver<UpdateSettings>,
+    update_send: Sender<ColorUniverse>,
+    update_command_recv: Receiver<UpdaterCommand>,
     update_settings: UpdateSettings,
     universe: ColorUniverse,
 }
 
 impl Updater {
-    fn new(update_output: Sender<ColorUniverse>,
-           update_settings_recv: Receiver<UpdateSettings>,
-           universe: ColorUniverse)
-           -> Updater {
-        Updater {
-            update_output: update_output,
-            update_settings_recv: update_settings_recv,
+    pub fn new(universe: ColorUniverse) -> (Updater, Receiver<ColorUniverse>, Sender<UpdaterCommand>) {
+        let (update_send, update_recv) = channel();
+        let (update_command_send, update_command_recv) = channel();
+        (Updater {
+            update_send: update_send,
+            update_command_recv: update_command_recv,
             update_settings: UpdateSettings::default(),
             universe: universe,
-        }
+        },
+        update_recv,
+        update_command_send)
     }
 
     // WIP/TODO
-    fn iterate(&mut self) {
+    pub fn iterate(&mut self) -> IterationResult {
         // check for any new settings
-        
+        match self.update_command_recv.try_recv() {
+            Ok(command) => {
+                match command {
+                    UpdaterCommand::UpdateSettings(new_settings) => {
+                        self.update_settings = new_settings;
+                    }
+                }
+            },
+            Err(TryRecvError::Empty) => {},
+            Err(e) => return IterationResult::Error(format!("{}", e)),
+        }
+
         // update the universe
         self.universe
             .update_state_repeat(self.update_settings.time, self.update_settings.iterations);
-        
+
         // write out the new universe to the ringbuffer
-        self.update_output.send(self.universe.clone()).unwrap();
+        if let Err(_) = self.update_send.send(self.universe.clone()) {
+            return IterationResult::Finished;
+        }
+
+        // continue
+        IterationResult::Ok
     }
+}
+
+pub enum UpdaterCommand {
+    UpdateSettings(UpdateSettings)
 }
 
 pub struct UpdateSettings {
