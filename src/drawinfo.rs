@@ -14,10 +14,10 @@ impl Default for DrawInfo {
         DrawInfo {
             x_size: 800.,
             y_size: 800.,
-            x_scale: 1.,
-            y_scale: 1.,
-            x_shift: 0.,
-            y_shift: 0.,
+            x_scale: 0.08,
+            y_scale: 0.08,
+            x_shift: 5000.,
+            y_shift: 5000.,
         }
     }
 }

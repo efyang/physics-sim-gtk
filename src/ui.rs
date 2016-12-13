@@ -17,7 +17,6 @@ pub struct Ui {
     drawarea: SharedState<DrawingArea>,
     universe: SharedState<ColorUniverse>,
     drawinfo: SharedState<DrawInfo>,
-    testvar: SharedState<f64>,
     universe_recv: SharedState<Receiver<ColorUniverse>>,
     update_settings: SharedState<UpdateSettings>,
     update_command_send: SharedState<Sender<UpdaterCommand>>,
@@ -25,8 +24,29 @@ pub struct Ui {
 
 impl Ui {
     pub fn initialize() -> Ui {
+        let setup_tmp_universe = {
+            let mut universe = ColorUniverse::default();
+
+            universe.add_object(::physics_sim::Object::new(5_000_000.,
+                                                           ::physics_sim::Vector::new(0.001111, (-180f64).to_radians()),
+                                                           ::physics_sim::Point::new(0., 500.)),
+                                                           ::color::ObjectColor::FromMass);
+            universe.add_object(::physics_sim::Object::new(5_000_000.,
+                                                           ::physics_sim::Vector::new(0.001111, (-60f64).to_radians()),
+                                                           ::physics_sim::Point::new(-353.5539, -353.5539)),
+                                                           ::color::ObjectColor::FromMass);
+            universe.add_object(::physics_sim::Object::new(5_000_000.,
+                                                           ::physics_sim::Vector::new(0.001111, (60f64).to_radians()),
+                                                           ::physics_sim::Point::new(353.5539, -353.5539)),
+                                                           ::color::ObjectColor::FromMass);
+            universe
+        };
+
+        // let (mut updater, universe_recv, update_command_send) =
+        // Updater::new(ColorUniverse::default());
         let (mut updater, universe_recv, update_command_send) =
-            Updater::new(ColorUniverse::default());
+            Updater::new(setup_tmp_universe.clone());
+
         let window = default_window();
         let mainsplit = gtk::Box::new(Orientation::Vertical, 10);
         let drawarea = DrawingArea::new();
@@ -40,9 +60,9 @@ impl Ui {
             fpsinfo: SharedState::new(FpsInfo::default()),
             state: SharedState::new(UiState::default()),
             drawarea: SharedState::new(drawarea),
-            universe: SharedState::new(ColorUniverse::default()),
+            // universe: SharedState::new(ColorUniverse::default()),
+            universe: SharedState::new(setup_tmp_universe),
             drawinfo: SharedState::new(DrawInfo::default()),
-            testvar: SharedState::new(0f64),
             universe_recv: SharedState::new(universe_recv),
             update_settings: SharedState::new(UpdateSettings::default()),
             update_command_send: SharedState::new(update_command_send),
@@ -69,7 +89,6 @@ impl Ui {
         let universe = self.universe.clone();
         let drawarea = self.drawarea.get_state();
         let drawinfo = self.drawinfo.clone();
-        let testvar = self.testvar.clone();
         drawarea.set_size_request(800, 800);
         drawarea.connect_draw(move |drawarea, ctxt| {
             // apply the drawing info
@@ -78,14 +97,9 @@ impl Ui {
             universe.get_state().draw_all(ctxt);
 
             // NOTE: placeholder
-            ctxt.set_operator(::cairo::Operator::Source);
-            ctxt.set_source_rgb(0.0, 0.5, 0.0);
-            ctxt.paint();
-
-            ctxt.set_source_rgb(0.5, 0.5, 0.5);
-            ctxt.rectangle(*testvar.get_state(), 400., 50., 50.);
-            ctxt.fill();
-            *testvar.get_state_mut() += 1.;
+            // ctxt.set_operator(::cairo::Operator::Source);
+            // ctxt.set_source_rgb(0.0, 0.5, 0.0);
+            // ctxt.paint();
 
             // get ready for next fps update
             fpsinfo.get_state_mut().update_time();
@@ -116,7 +130,6 @@ impl Ui {
 
     pub fn iterate(&mut self) -> IterationResult {
         if self.fpsinfo.get_state().should_redraw() {
-            println!("next frame");
             self.drawarea.get_state().queue_draw();
         }
 

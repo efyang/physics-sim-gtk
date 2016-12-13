@@ -69,8 +69,8 @@ pub struct UpdateSettings {
 impl Default for UpdateSettings {
     fn default() -> UpdateSettings {
         UpdateSettings {
-            time: 1.,
-            iterations: 10,
+            time: 30_000.,
+            iterations: 100,
         }
     }
 }

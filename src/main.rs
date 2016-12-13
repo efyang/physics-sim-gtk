@@ -10,9 +10,10 @@ mod editstate;
 mod ui;
 mod sharedstate;
 mod fpsinfo;
+#[macro_use]
+mod color;
 mod drawinfo;
 mod drawobject;
-mod color;
 mod updater;
 mod coloruniverse;
 mod iteration_result;
@@ -26,7 +27,7 @@ fn main() {
 
     let mut ui = Ui::initialize();
 
-    gtk::timeout_add(50, move || {
+    gtk::timeout_add(30, move || {
         let mut continue_state = true;
         match ui.iterate() {
             IterationResult::Ok => {}
