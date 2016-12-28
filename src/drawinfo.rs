@@ -28,17 +28,26 @@ impl DrawInfo {
         self.y_size = y_size;
     }
 
-    pub fn scale(&mut self, scale_center_x: f64, scale_center_y: f64, factor: f64) {
-        self.x_scale *= factor;
-        self.y_scale *= factor;
-        self.x_shift -= (factor - 1.) * (scale_center_x - self.x_shift);
-        self.y_shift -= (factor - 1.) * (scale_center_y - self.y_shift);
+    pub fn translate(&mut self, x_trans: f64, y_trans: f64) {
+        self.x_shift += x_trans;
+        self.y_shift += y_trans;
+    }
+
+    pub fn scale(&mut self, scale_center_x: f64, scale_center_y: f64, x_factor: f64, y_factor: f64) {
+        self.x_scale *= x_factor;
+        self.y_scale *= y_factor;
+        self.x_shift -= (x_factor - 1.) * (scale_center_x - self.x_shift);
+        self.y_shift -= (y_factor - 1.) * (scale_center_y - self.y_shift);
     }
 
     pub fn apply(&mut self, ctxt: &Context) {
         ctxt.identity_matrix();
         ctxt.translate(self.x_shift, self.y_shift);
         ctxt.scale(self.x_scale, self.y_scale);
+    }
+
+    pub fn reset_view(&mut self) {
+        *self = DrawInfo {x_size: self.x_size, y_size: self.y_size, ..DrawInfo::default()};
     }
 }
 

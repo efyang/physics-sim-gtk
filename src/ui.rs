@@ -10,6 +10,8 @@ use drawobject::DrawAll;
 use std::sync::mpsc::{Sender, Receiver, TryRecvError};
 use updater::{UpdateSettings, UpdaterCommand, Updater};
 use iteration_result::IterationResult;
+use keys::InputInfo;
+use gdk::enums::key;
 
 pub struct Ui {
     fpsinfo: SharedState<FpsInfo>,
@@ -20,6 +22,7 @@ pub struct Ui {
     universe_recv: SharedState<Receiver<ColorUniverse>>,
     update_settings: SharedState<UpdateSettings>,
     update_command_send: SharedState<Sender<UpdaterCommand>>,
+    input_info: SharedState<InputInfo>,
 }
 
 impl Ui {
@@ -66,6 +69,7 @@ impl Ui {
             universe_recv: SharedState::new(universe_recv),
             update_settings: SharedState::new(UpdateSettings::default()),
             update_command_send: SharedState::new(update_command_send),
+            input_info: SharedState::new(InputInfo::default()),
         };
         this.setup_draw_callbacks();
         this.setup_mouse_callbacks();
@@ -113,29 +117,86 @@ impl Ui {
         let drawarea = self.drawarea.get_state();
         drawarea.set_can_focus(true);
 
-        window.connect_key_press_event(|_, key| {
-            println!("keypressed");
-            Inhibit(false)
-        });
+        {
+            let input_info = self.input_info.clone();
+            let drawinfo = self.drawinfo.clone();
+            window.connect_key_press_event(move |_, key| {
+                match key.get_keyval() {
+                    key::Shift_L | key::Shift_R => {
+                        input_info.get_state_mut().shift = true;
+                    }
+                    key::Control_L | key::Control_R => {
+                        input_info.get_state_mut().ctrl = true;
+                    }
+                    key::Up => {
+                        input_info.get_state_mut().up = true;
+                    }
+                    key::Down => {
+                        input_info.get_state_mut().down = true;
+                    }
+                    key::Left => {
+                        input_info.get_state_mut().left = true;
+                    }
+                    key::Right => {
+                        input_info.get_state_mut().right = true;
+                    }
+                    _ => {
+                        println!("keypressed");
+                    }
+                }
 
-        let update_command_send = self.update_command_send.clone();
-        let uistate = self.state.clone();
-        window.connect_key_release_event(move |_, key| {
-            match key.get_keyval() {
-                ::gdk::enums::key::P | ::gdk::enums::key::p => {
-                    let new_paused = match *uistate.get_state() {
-                        UiState::Paused => UiState::Normal,
-                        _ => UiState::Paused
-                    };
-                    *uistate.get_state_mut() = new_paused;
-                    update_command_send.get_state().send(UpdaterCommand::TogglePaused).unwrap();
+                Inhibit(false)
+            });
+        }
+
+        {
+            let update_command_send = self.update_command_send.clone();
+            let uistate = self.state.clone();
+            let input_info = self.input_info.clone();
+            let drawinfo = self.drawinfo.clone();
+            window.connect_key_release_event(move |_, key| {
+                match key.get_keyval() {
+                    key::P | key::p => {
+                        let new_paused = match *uistate.get_state() {
+                            UiState::Paused => UiState::Normal,
+                            _ => UiState::Paused
+                        };
+                        *uistate.get_state_mut() = new_paused;
+                        update_command_send.get_state().send(UpdaterCommand::TogglePaused).unwrap();
+                    }
+                    key::Shift_L | key::Shift_R => {
+                        input_info.get_state_mut().shift = false;
+                    }
+                    key::Control_L | key::Control_R => {
+                        input_info.get_state_mut().ctrl = false;
+                    }
+                    key::Up => {
+                        input_info.get_state_mut().up = false;
+                    }
+                    key::Down => {
+                        input_info.get_state_mut().down = false;
+                    }
+                    key::Left => {
+                        input_info.get_state_mut().left = false;
+                    }
+                    key::Right => {
+                        input_info.get_state_mut().right = false;
+                    }
+                    key::BackSpace => {
+                        let ref mut backspace = input_info.get_state_mut().backspace;
+                        backspace.next_state();
+                        if backspace.should_reset() {
+                            drawinfo.get_state_mut().reset_view();
+                            backspace.next_state();
+                        }
+                    }
+                    _ => {
+                        println!("keypress");
+                    }
                 }
-                _ => {
-                    println!("keypress");
-                }
-            }
-            Inhibit(false)
-        });
+                Inhibit(false)
+            });
+        }
     }
 
     fn setup_mouse_callbacks(&self) {
@@ -144,6 +205,7 @@ impl Ui {
         drawarea.add_events(::gdk_sys::GDK_BUTTON_PRESS_MASK.bits() as i32);
         drawarea.add_events(::gdk_sys::GDK_BUTTON_RELEASE_MASK.bits() as i32);
         drawarea.add_events(::gdk_sys::GDK_SCROLL_MASK.bits() as i32);
+        drawarea.add_events(::gdk_sys::GDK_POINTER_MOTION_MASK.bits() as i32);
 
         drawarea.connect_button_press_event(|_, key| {
             println!("mouse press");
@@ -155,18 +217,40 @@ impl Ui {
             Inhibit(false)
         });
 
-        let drawinfo = self.drawinfo.clone();
-        drawarea.connect_scroll_event(move |_, scroll| {
-            let (x, y) = scroll.get_position();
-            match scroll.as_ref().direction {
-                ::gdk_sys::GdkScrollDirection::Up => {
-                    drawinfo.get_state_mut().scale(x, y, 1.01);
+        {
+            let drawinfo = self.drawinfo.clone();
+            let input_info = self.input_info.clone();
+            drawarea.connect_scroll_event(move |_, scroll| {
+                let ref input_info = *input_info.get_state();
+                let (x, y) = scroll.get_position();
+                match scroll.as_ref().direction {
+                    ::gdk_sys::GdkScrollDirection::Up => {
+                        if !(input_info.ctrl ^ input_info.shift) {
+                            // either or none
+                            drawinfo.get_state_mut().scale(x, y, 1.01, 1.01);
+                        } else if input_info.ctrl {
+                            drawinfo.get_state_mut().scale(x, y, 1.01, 1.);
+                        } else if input_info.shift {
+                            drawinfo.get_state_mut().scale(x, y, 1., 1.01);
+                        }
+                    }
+                    ::gdk_sys::GdkScrollDirection::Down => {
+                        if !(input_info.ctrl ^ input_info.shift) {
+                            drawinfo.get_state_mut().scale(x, y, 0.99, 0.99);
+                        } else if input_info.ctrl {
+                            drawinfo.get_state_mut().scale(x, y, 0.99, 1.);
+                        } else if input_info.shift {
+                            drawinfo.get_state_mut().scale(x, y, 1., 0.99);
+                        }
+                    }
+                    _ => {}
                 }
-                ::gdk_sys::GdkScrollDirection::Down => {
-                    drawinfo.get_state_mut().scale(x, y, 0.99);
-                }
-                _ => {}
-            }
+                Inhibit(false)
+            });
+        }
+
+        drawarea.connect_motion_notify_event(move |_, motion| {
+            let (mx, my) = motion.get_position();
             Inhibit(false)
         });
     }
@@ -191,8 +275,24 @@ impl Ui {
     // fn setup_button_callbacks(buttons: ) {
 
     // }
+    fn handle_input_iteration(&mut self) {
+        let input_info = self.input_info.get_state();
+        let ref mut drawinfo = *self.drawinfo.get_state_mut();
+        if input_info.up {
+            drawinfo.translate(0., 7.5);
+        } else if input_info.down {
+            drawinfo.translate(0., -7.5);
+        }
+        if input_info.left {
+            drawinfo.translate(7.5, 0.);
+        } else if input_info.right{
+            drawinfo.translate(-7.5, 0.);
+        }
+    }
 
     pub fn iterate(&mut self) -> IterationResult {
+        self.handle_input_iteration();
+
         if self.fpsinfo.get_state().should_redraw() {
             self.drawarea.get_state().queue_draw();
         }

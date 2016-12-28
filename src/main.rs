@@ -19,6 +19,7 @@ mod drawobject;
 mod updater;
 mod coloruniverse;
 mod iteration_result;
+mod keys;
 
 use gtk::prelude::*;
 use ui::Ui;
