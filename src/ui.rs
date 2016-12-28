@@ -298,16 +298,18 @@ impl Ui {
         // handle the mouse position (if its within borders then move view)
         let (x_size, y_size) = drawinfo.get_size();
         if allow_mouse_movement && input_info.mouse_within_any_side_border(x_size, y_size) {
-            if input_info.mouse_top_move_border(y_size) {
-                drawinfo.translate(0., 7.5);
-            } else if input_info.mouse_bottom_move_border(y_size) {
-                drawinfo.translate(0., -7.5);
+            let (mut x_trans, mut y_trans) = (0., 0.);
+            if let Some(distance) = input_info.mouse_top_move_border(y_size) {
+                y_trans = 10. * (1. - distance/::keys::MOUSE_MOVEMENT_BORDER_WIDTH);
+            } else if let Some(distance) = input_info.mouse_bottom_move_border(y_size) {
+                y_trans = -10. * (1. - distance/::keys::MOUSE_MOVEMENT_BORDER_WIDTH);
             }
-            if input_info.mouse_left_move_border(x_size) {
-                drawinfo.translate(7.5, 0.);
-            } else if input_info.mouse_right_move_border(x_size) {
-                drawinfo.translate(-7.5, 0.);
+            if let Some(distance) = input_info.mouse_left_move_border(x_size) {
+                x_trans = 10. * (1. - distance/::keys::MOUSE_MOVEMENT_BORDER_WIDTH);
+            } else if let Some(distance) = input_info.mouse_right_move_border(x_size) {
+                x_trans = -10. * (1. - distance/::keys::MOUSE_MOVEMENT_BORDER_WIDTH);
             }
+            drawinfo.translate(x_trans, y_trans);
         } else {
             // handle the arrow keys
             if input_info.up {
