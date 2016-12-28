@@ -28,6 +28,10 @@ impl DrawInfo {
         self.y_size = y_size;
     }
 
+    pub fn get_size(&self) -> (f64, f64) {
+        (self.x_size, self.y_size)
+    }
+
     pub fn translate(&mut self, x_trans: f64, y_trans: f64) {
         self.x_shift += x_trans;
         self.y_shift += y_trans;

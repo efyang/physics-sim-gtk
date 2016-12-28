@@ -23,6 +23,7 @@ pub struct Ui {
     update_settings: SharedState<UpdateSettings>,
     update_command_send: SharedState<Sender<UpdaterCommand>>,
     input_info: SharedState<InputInfo>,
+    allow_mouse_movement: SharedState<bool>,
 }
 
 impl Ui {
@@ -70,6 +71,7 @@ impl Ui {
             update_settings: SharedState::new(UpdateSettings::default()),
             update_command_send: SharedState::new(update_command_send),
             input_info: SharedState::new(InputInfo::default()),
+            allow_mouse_movement: SharedState::new(true),
         };
         this.setup_draw_callbacks();
         this.setup_mouse_callbacks();
@@ -154,6 +156,7 @@ impl Ui {
             let uistate = self.state.clone();
             let input_info = self.input_info.clone();
             let drawinfo = self.drawinfo.clone();
+            let allow_mouse_movement = self.allow_mouse_movement.clone();
             window.connect_key_release_event(move |_, key| {
                 match key.get_keyval() {
                     key::P | key::p => {
@@ -189,6 +192,10 @@ impl Ui {
                             drawinfo.get_state_mut().reset_view();
                             backspace.next_state();
                         }
+                    }
+                    key::M | key::m => {
+                        let new_allow = !*allow_mouse_movement.get_state();
+                        *allow_mouse_movement.get_state_mut() = new_allow;
                     }
                     _ => {
                         println!("keypress");
@@ -249,10 +256,16 @@ impl Ui {
             });
         }
 
-        drawarea.connect_motion_notify_event(move |_, motion| {
-            let (mx, my) = motion.get_position();
-            Inhibit(false)
-        });
+        {
+            let input_info = self.input_info.clone();
+            drawarea.connect_motion_notify_event(move |_, motion| {
+                let ref mut input_info = *input_info.get_state_mut();
+                let (mx, my) = motion.get_position();
+                input_info.mouse_x = mx;
+                input_info.mouse_y = my;
+                Inhibit(false)
+            });
+        }
     }
 
     fn setup_window_callbacks(&self, window: &Window) {
@@ -266,7 +279,8 @@ impl Ui {
         window.connect_check_resize(move |_| {
             // set the new size
             let drawarea = drawarea.get_state();
-            let (x_size, y_size) = drawarea.get_size_request();
+            let allocation_size = drawarea.get_allocation();
+            let (x_size, y_size) = (allocation_size.width, allocation_size.height);
             drawinfo.get_state_mut().set_size(x_size as f64, y_size as f64);
             drawarea.queue_draw();
         });
@@ -275,18 +289,37 @@ impl Ui {
     // fn setup_button_callbacks(buttons: ) {
 
     // }
+
     fn handle_input_iteration(&mut self) {
         let input_info = self.input_info.get_state();
         let ref mut drawinfo = *self.drawinfo.get_state_mut();
-        if input_info.up {
-            drawinfo.translate(0., 7.5);
-        } else if input_info.down {
-            drawinfo.translate(0., -7.5);
-        }
-        if input_info.left {
-            drawinfo.translate(7.5, 0.);
-        } else if input_info.right{
-            drawinfo.translate(-7.5, 0.);
+        let allow_mouse_movement = *self.allow_mouse_movement.get_state();
+
+        // handle the mouse position (if its within borders then move view)
+        let (x_size, y_size) = drawinfo.get_size();
+        if allow_mouse_movement && input_info.mouse_within_any_side_border(x_size, y_size) {
+            if input_info.mouse_top_move_border(y_size) {
+                drawinfo.translate(0., 7.5);
+            } else if input_info.mouse_bottom_move_border(y_size) {
+                drawinfo.translate(0., -7.5);
+            }
+            if input_info.mouse_left_move_border(x_size) {
+                drawinfo.translate(7.5, 0.);
+            } else if input_info.mouse_right_move_border(x_size) {
+                drawinfo.translate(-7.5, 0.);
+            }
+        } else {
+            // handle the arrow keys
+            if input_info.up {
+                drawinfo.translate(0., 7.5);
+            } else if input_info.down {
+                drawinfo.translate(0., -7.5);
+            }
+            if input_info.left {
+                drawinfo.translate(7.5, 0.);
+            } else if input_info.right{
+                drawinfo.translate(-7.5, 0.);
+            }
         }
     }
 
