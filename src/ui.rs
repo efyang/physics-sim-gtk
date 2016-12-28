@@ -7,7 +7,7 @@ use sharedstate::SharedState;
 use fpsinfo::FpsInfo;
 use drawinfo::DrawInfo;
 use drawobject::DrawAll;
-use std::sync::mpsc::{Sender, Receiver};
+use std::sync::mpsc::{Sender, Receiver, TryRecvError};
 use updater::{UpdateSettings, UpdaterCommand, Updater};
 use iteration_result::IterationResult;
 
@@ -51,8 +51,8 @@ impl Ui {
         let mainsplit = gtk::Box::new(Orientation::Vertical, 10);
         let drawarea = DrawingArea::new();
         let input_interface = gtk::Box::new(Orientation::Horizontal, 10);
-        mainsplit.add(&drawarea);
-        mainsplit.add(&input_interface);
+        mainsplit.pack_start(&drawarea, true, true, 0);
+        mainsplit.pack_end(&input_interface, false, true, 0);
         window.add(&mainsplit);
         window.show_all();
 
@@ -68,6 +68,8 @@ impl Ui {
             update_command_send: SharedState::new(update_command_send),
         };
         this.setup_draw_callbacks();
+        this.setup_mouse_callbacks();
+        this.setup_key_callbacks(&window);
         this.setup_window_callbacks(&window);
         ::std::thread::spawn(move || {
             loop {
@@ -92,7 +94,7 @@ impl Ui {
         drawarea.set_size_request(800, 800);
         drawarea.connect_draw(move |drawarea, ctxt| {
             // apply the drawing info
-            drawinfo.get_state().apply(ctxt);
+            drawinfo.get_state_mut().apply(ctxt);
             // draw everything
             universe.get_state().draw_all(ctxt);
 
@@ -103,6 +105,68 @@ impl Ui {
 
             // get ready for next fps update
             fpsinfo.get_state_mut().update_time();
+            Inhibit(false)
+        });
+    }
+
+    fn setup_key_callbacks(&self, window: &Window) {
+        let drawarea = self.drawarea.get_state();
+        drawarea.set_can_focus(true);
+
+        window.connect_key_press_event(|_, key| {
+            println!("keypressed");
+            Inhibit(false)
+        });
+
+        let update_command_send = self.update_command_send.clone();
+        let uistate = self.state.clone();
+        window.connect_key_release_event(move |_, key| {
+            match key.get_keyval() {
+                ::gdk::enums::key::P | ::gdk::enums::key::p => {
+                    let new_paused = match *uistate.get_state() {
+                        UiState::Paused => UiState::Normal,
+                        _ => UiState::Paused
+                    };
+                    *uistate.get_state_mut() = new_paused;
+                    update_command_send.get_state().send(UpdaterCommand::TogglePaused).unwrap();
+                }
+                _ => {
+                    println!("keypress");
+                }
+            }
+            Inhibit(false)
+        });
+    }
+
+    fn setup_mouse_callbacks(&self) {
+        let drawarea = self.drawarea.get_state();
+
+        drawarea.add_events(::gdk_sys::GDK_BUTTON_PRESS_MASK.bits() as i32);
+        drawarea.add_events(::gdk_sys::GDK_BUTTON_RELEASE_MASK.bits() as i32);
+        drawarea.add_events(::gdk_sys::GDK_SCROLL_MASK.bits() as i32);
+
+        drawarea.connect_button_press_event(|_, key| {
+            println!("mouse press");
+            Inhibit(false)
+        });
+
+        drawarea.connect_button_release_event(|_, key| {
+            println!("mouse release");
+            Inhibit(false)
+        });
+
+        let drawinfo = self.drawinfo.clone();
+        drawarea.connect_scroll_event(move |_, scroll| {
+            let (x, y) = scroll.get_position();
+            match scroll.as_ref().direction {
+                ::gdk_sys::GdkScrollDirection::Up => {
+                    drawinfo.get_state_mut().scale(x, y, 1.01);
+                }
+                ::gdk_sys::GdkScrollDirection::Down => {
+                    drawinfo.get_state_mut().scale(x, y, 0.99);
+                }
+                _ => {}
+            }
             Inhibit(false)
         });
     }
@@ -134,11 +198,17 @@ impl Ui {
         }
 
         // check the updater output
-        match self.universe_recv.get_state().recv() {
-            Ok(new_universe) => *self.universe.get_state_mut() = new_universe,
-            Err(e) => {
-                // should never happen
-                return IterationResult::Error(format!("{}", e));
+        match *self.state.get_state() {
+            UiState::Paused => {}
+            _ => {
+                match self.universe_recv.get_state().try_recv() {
+                    Ok(new_universe) => *self.universe.get_state_mut() = new_universe,
+                    Err(TryRecvError::Empty) => {},
+                    Err(e) => {
+                        // should never happen
+                        return IterationResult::Error(format!("{}", e));
+                    }
+                }
             }
         }
 

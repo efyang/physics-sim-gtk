@@ -1,4 +1,4 @@
-use cairo::Context;
+use cairo::{Context, Matrix, MatrixTrait};
 
 pub struct DrawInfo {
     x_size: f64,
@@ -16,8 +16,8 @@ impl Default for DrawInfo {
             y_size: 800.,
             x_scale: 0.08,
             y_scale: 0.08,
-            x_shift: 5000.,
-            y_shift: 5000.,
+            x_shift: 400.,
+            y_shift: 400.,
         }
     }
 }
@@ -28,10 +28,17 @@ impl DrawInfo {
         self.y_size = y_size;
     }
 
-    pub fn apply(&self, ctxt: &Context) {
+    pub fn scale(&mut self, scale_center_x: f64, scale_center_y: f64, factor: f64) {
+        self.x_scale *= factor;
+        self.y_scale *= factor;
+        self.x_shift -= (factor - 1.) * (scale_center_x - self.x_shift);
+        self.y_shift -= (factor - 1.) * (scale_center_y - self.y_shift);
+    }
+
+    pub fn apply(&mut self, ctxt: &Context) {
         ctxt.identity_matrix();
-        ctxt.scale(self.x_scale, self.y_scale);
         ctxt.translate(self.x_shift, self.y_shift);
+        ctxt.scale(self.x_scale, self.y_scale);
     }
 }
 

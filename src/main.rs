@@ -4,6 +4,8 @@ extern crate gtk;
 extern crate cairo;
 extern crate physics_sim;
 extern crate time;
+extern crate gdk_sys;
+extern crate gdk;
 
 mod uistate;
 mod editstate;

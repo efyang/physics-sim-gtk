@@ -12,6 +12,8 @@ pub struct Updater {
     update_command_recv: Receiver<UpdaterCommand>,
     update_settings: UpdateSettings,
     universe: ColorUniverse,
+    paused: bool,
+    fps_update_time: f64,
 }
 
 impl Updater {
@@ -23,6 +25,8 @@ impl Updater {
             update_command_recv: update_command_recv,
             update_settings: UpdateSettings::default(),
             universe: universe,
+            paused: false,
+            fps_update_time: 1./60.,
         },
         update_recv,
         update_command_send)
@@ -30,12 +34,19 @@ impl Updater {
 
     // WIP/TODO
     pub fn iterate(&mut self) -> IterationResult {
+        let start_time = ::time::precise_time_s();
         // check for any new settings
         match self.update_command_recv.try_recv() {
             Ok(command) => {
                 match command {
                     UpdaterCommand::UpdateSettings(new_settings) => {
                         self.update_settings = new_settings;
+                    }
+                    UpdaterCommand::TogglePaused => {
+                        self.paused = !self.paused;
+                    }
+                    UpdaterCommand::SetFpsUpdateTime(update_time) => {
+                        self.fps_update_time = update_time;
                     }
                 }
             },
@@ -44,13 +55,18 @@ impl Updater {
         }
 
         // update the universe
-        self.universe
-            .update_state_repeat(self.update_settings.time, self.update_settings.iterations);
+        if !self.paused {
+            self.universe
+                .update_state_repeat(self.update_settings.time, self.update_settings.iterations);
 
-        // write out the new universe to the ringbuffer
-        if let Err(_) = self.update_send.send(self.universe.clone()) {
-            return IterationResult::Finished;
+            // write out the new universe to the ringbuffer
+            if let Err(_) = self.update_send.send(self.universe.clone()) {
+                return IterationResult::Finished;
+            }
         }
+
+        let time_taken = ::time::precise_time_s() - start_time;
+        ::std::thread::sleep(::std::time::Duration::from_millis(((self.fps_update_time - time_taken) * 1000.) as u64));
 
         // continue
         IterationResult::Ok
@@ -58,7 +74,9 @@ impl Updater {
 }
 
 pub enum UpdaterCommand {
-    UpdateSettings(UpdateSettings)
+    UpdateSettings(UpdateSettings),
+    TogglePaused,
+    SetFpsUpdateTime(f64),
 }
 
 pub struct UpdateSettings {

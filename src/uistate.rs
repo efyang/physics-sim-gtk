@@ -3,7 +3,7 @@ use super::editstate::EditState;
 pub enum UiState {
     Normal,
     Edit(EditState),
-    Stop,
+    Paused,
 }
 
 impl Default for UiState {
