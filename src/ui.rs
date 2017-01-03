@@ -4,14 +4,18 @@ use cairo::prelude::*;
 use coloruniverse::ColorUniverse;
 use uistate::UiState;
 use sharedstate::SharedState;
-use fpsinfo::FpsInfo;
+use fpsinfo::*;
 use drawinfo::DrawInfo;
-use drawobject::DrawAll;
+use drawobject::{Draw, DrawAll};
 use std::sync::mpsc::{Sender, Receiver, TryRecvError};
 use updater::{UpdateSettings, UpdaterCommand, Updater};
 use iteration_result::IterationResult;
 use keys::InputInfo;
 use gdk::enums::key;
+use editstate::{EditState, MouseEditState};
+use physics_sim::{Object, Point, Vector};
+use color::{mass_to_color, ObjectColor};
+use draw::draw_arrow_head;
 
 pub struct Ui {
     fpsinfo: SharedState<FpsInfo>,
@@ -97,17 +101,71 @@ impl Ui {
         let universe = self.universe.clone();
         let drawarea = self.drawarea.get_state();
         let drawinfo = self.drawinfo.clone();
+        let uistate = self.state.clone();
+        let input_info = self.input_info.clone();
         drawarea.set_size_request(800, 800);
         drawarea.connect_draw(move |drawarea, ctxt| {
             // apply the drawing info
             drawinfo.get_state_mut().apply(ctxt);
             // draw everything
             universe.get_state().draw_all(ctxt);
+            // draw the mode;
 
-            // NOTE: placeholder
-            // ctxt.set_operator(::cairo::Operator::Source);
-            // ctxt.set_source_rgb(0.0, 0.5, 0.0);
-            // ctxt.paint();
+            // draw the edit information(if its in edit mode)
+            match *uistate.get_state() {
+                UiState::Edit(ref editstate) => {
+                    let ref input_info = *input_info.get_state();
+                    let mouse_raw = drawinfo.get_state().get_actual_point(input_info.mouse_x, input_info.mouse_y);
+                    let mouse = Point::new(mouse_raw.0, mouse_raw.1);
+                    match *editstate {
+                        EditState::Mouse(ref mouse_edit_state) => {
+                            match *mouse_edit_state {
+                                MouseEditState::SetPoint => {
+                                    ctxt.arc(mouse.x, mouse.y, 5., 0., 2. * ::std::f64::consts::PI);
+                                    ctxt.set_source_rgba(1., 1., 1., 0.4);
+                                    ctxt.fill();
+                                }
+                                MouseEditState::SetMass(center_pt) => {
+                                    let radius = mouse.distance_to(&center_pt);
+                                    let mass = (radius.powi(3) * ::std::f64::consts::PI) / 0.75;
+                                    ctxt.arc(center_pt.x, center_pt.y, radius, 0., 2. * ::std::f64::consts::PI);
+                                    let color = mass_to_color(mass);
+                                    ctxt.set_source_rgba(color.0, color.1, color.2, 0.4);
+                                    ctxt.fill();
+                                }
+                                MouseEditState::SetVelocity(mass, center_pt) => {
+                                    // draw object
+                                    let tmp_object = Object::new(mass, Vector::default(), center_pt);
+                                    tmp_object.draw(ctxt, &ObjectColor::FromMass);
+
+                                    // draw potential velocity vector
+                                    ctxt.new_path();
+                                    ctxt.move_to(center_pt.x, center_pt.y);
+                                    ctxt.line_to(mouse.x, mouse.y);
+                                    ctxt.set_source_rgba(1., 1., 1., 0.4);
+                                    ctxt.set_line_width(drawinfo.get_state().get_actual_width(3.));
+                                    ctxt.stroke();
+                                    let y_dist = mouse.y - center_pt.y;
+                                    let x_dist = mouse.x - center_pt.x;
+                                    let line_angle = y_dist.atan2(x_dist);
+                                    draw_arrow_head(ctxt,
+                                                    mouse.x,
+                                                    mouse.y,
+                                                    line_angle,
+                                                    30f64.to_radians(),
+                                                    drawinfo.get_state().get_actual_width(10.),
+                                                    1.,
+                                                    1.,
+                                                    1.,
+                                                    0.4);
+                                }
+                            }
+                        }
+                        EditState::Input => {}
+                    }
+                }
+                _ => {}
+            }
 
             // get ready for next fps update
             fpsinfo.get_state_mut().update_time();
@@ -160,12 +218,30 @@ impl Ui {
             window.connect_key_release_event(move |_, key| {
                 match key.get_keyval() {
                     key::P | key::p => {
-                        let new_paused = match *uistate.get_state() {
-                            UiState::Paused => UiState::Normal,
-                            _ => UiState::Paused
+                        let new_state = match *uistate.get_state() {
+                            UiState::Paused => {
+                                update_command_send.get_state().send(UpdaterCommand::Unpause).unwrap();
+                                UiState::Normal
+                            },
+                            _ => {
+                                update_command_send.get_state().send(UpdaterCommand::Pause).unwrap();
+                                UiState::Paused
+                            },
                         };
-                        *uistate.get_state_mut() = new_paused;
-                        update_command_send.get_state().send(UpdaterCommand::TogglePaused).unwrap();
+                        *uistate.get_state_mut() = new_state;
+                    }
+                    key::E | key::e => {
+                        let new_state = match *uistate.get_state() {
+                            UiState::Edit(_) => {
+                                update_command_send.get_state().send(UpdaterCommand::Unpause).unwrap();
+                                UiState::Normal
+                            },
+                            _ => {
+                                update_command_send.get_state().send(UpdaterCommand::Pause).unwrap();
+                                UiState::Edit(EditState::default())
+                            },
+                        };
+                        *uistate.get_state_mut() = new_state;
                     }
                     key::Shift_L | key::Shift_R => {
                         input_info.get_state_mut().shift = false;
@@ -219,7 +295,40 @@ impl Ui {
             Inhibit(false)
         });
 
-        drawarea.connect_button_release_event(|_, key| {
+        let uistate = self.state.clone();
+        let input_info = self.input_info.clone();
+        let drawinfo = self.drawinfo.clone();
+        let update_settings = self.update_settings.clone();
+        let update_command_send = self.update_command_send.clone();
+        drawarea.connect_button_release_event(move |_, key| {
+            let ref mut uistate = *uistate.get_state_mut();
+            if let UiState::Edit(EditState::Mouse(ref mut mouse_edit_state)) = *uistate {
+                let ref input_info = *input_info.get_state();
+                let mouse_raw = drawinfo.get_state().get_actual_point(input_info.mouse_x, input_info.mouse_y);
+                let mouse = Point::new(mouse_raw.0, mouse_raw.1);
+                *mouse_edit_state = match *mouse_edit_state {
+                    MouseEditState::SetPoint => {
+                        MouseEditState::SetMass(mouse)
+                    }
+                    MouseEditState::SetMass(point) => {
+                        let radius = mouse.distance_to(&point);
+                        let mass = (radius.powi(3) * ::std::f64::consts::PI) / 0.75;
+                        MouseEditState::SetVelocity(mass, point)
+                    }
+                    MouseEditState::SetVelocity(mass, point) => {
+                        let y_dist = mouse.y - point.y;
+                        let x_dist = mouse.x - point.x;
+                        let line_angle = y_dist.atan2(x_dist);
+                        let distance = mouse.distance_to(&point);
+                        let v_magnitude = distance/(update_settings.get_state().time() * DEFAULT_FPS);
+
+                        let new_object = Object::new(mass, Vector::new(v_magnitude, line_angle), point);
+                        update_command_send.get_state_mut().send(UpdaterCommand::AddObject(new_object)).unwrap();
+                        // go back to initial state
+                        MouseEditState::SetPoint
+                    }
+                }
+            }
             println!("mouse release");
             Inhibit(false)
         });
@@ -333,9 +442,9 @@ impl Ui {
         }
 
         // check the updater output
-        match *self.state.get_state() {
-            UiState::Paused => {}
-            _ => {
+        //match *self.state.get_state() {
+            //UiState::Paused | UiState::Edit(_) => {}
+            //_ => {
                 match self.universe_recv.get_state().try_recv() {
                     Ok(new_universe) => *self.universe.get_state_mut() = new_universe,
                     Err(TryRecvError::Empty) => {},
@@ -344,8 +453,8 @@ impl Ui {
                         return IterationResult::Error(format!("{}", e));
                     }
                 }
-            }
-        }
+            //}
+        //}
 
         IterationResult::Ok
     }

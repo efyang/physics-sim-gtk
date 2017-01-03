@@ -1,18 +1,20 @@
+use physics_sim::Point;
+
 pub enum EditState {
-    Mouse,
+    Mouse(MouseEditState),
     Input,
 }
 
 impl Default for EditState {
     fn default() -> EditState {
-        EditState::Mouse
+        EditState::Mouse(MouseEditState::SetPoint)
     }
 }
 
 pub enum MouseEditState {
     SetPoint,
-    SetMass,
-    SetVelocity,
+    SetMass(Point),
+    SetVelocity(f64, Point),
 }
 
 impl Default for MouseEditState {

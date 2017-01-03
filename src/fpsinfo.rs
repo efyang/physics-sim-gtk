@@ -1,6 +1,6 @@
 use time::precise_time_s;
 
-const DEFAULT_FPS: f64 = 60.;
+pub const DEFAULT_FPS: f64 = 60.;
 
 #[derive(Clone)]
 pub struct FpsInfo {

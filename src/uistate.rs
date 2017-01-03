@@ -1,4 +1,4 @@
-use super::editstate::EditState;
+use editstate::EditState;
 
 pub enum UiState {
     Normal,

@@ -20,7 +20,7 @@ impl Into<ObjectColor> for Color {
     }
 }
 
-const COLOR_MOD: usize = 3_000_000;
+const COLOR_MOD: usize = 3_000_000_000;
 const COLOR_SEGMENT: usize = COLOR_MOD / 6;
 pub fn mass_to_color(mass: f64) -> Color {
     let mmass = mass as usize % COLOR_MOD;

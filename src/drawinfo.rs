@@ -23,6 +23,20 @@ impl Default for DrawInfo {
 }
 
 impl DrawInfo {
+    pub fn get_actual_point(&self, x: f64, y: f64) -> (f64, f64) {
+        //(x * self.x_scale + self.x_shift, y * self.y_scale + self.y_shift)
+        ((x - self.x_shift) / self.x_scale, (y - self.y_shift) / self.y_scale)
+    }
+
+    // used exclusively for cairo line width
+    pub fn get_actual_width(&self, width: f64) -> f64 {
+        if self.x_scale < self.y_scale {
+            width / self.x_scale
+        } else {
+            width / self.y_scale
+        }
+    }
+
     pub fn set_size(&mut self, x_size: f64, y_size: f64) {
         self.x_size = x_size;
         self.y_size = y_size;
@@ -37,7 +51,11 @@ impl DrawInfo {
         self.y_shift += y_trans;
     }
 
-    pub fn scale(&mut self, scale_center_x: f64, scale_center_y: f64, x_factor: f64, y_factor: f64) {
+    pub fn scale(&mut self,
+                 scale_center_x: f64,
+                 scale_center_y: f64,
+                 x_factor: f64,
+                 y_factor: f64) {
         self.x_scale *= x_factor;
         self.y_scale *= y_factor;
         self.x_shift -= (x_factor - 1.) * (scale_center_x - self.x_shift);
@@ -51,7 +69,11 @@ impl DrawInfo {
     }
 
     pub fn reset_view(&mut self) {
-        *self = DrawInfo {x_size: self.x_size, y_size: self.y_size, ..DrawInfo::default()};
+        *self = DrawInfo {
+            x_size: self.x_size,
+            y_size: self.y_size,
+            ..DrawInfo::default()
+        };
     }
 }
 

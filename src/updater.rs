@@ -1,6 +1,8 @@
 use std::sync::mpsc::{channel, Sender, Receiver, TryRecvError};
 use coloruniverse::ColorUniverse;
 use iteration_result::IterationResult;
+use color::ObjectColor;
+use physics_sim::Object;
 
 // if UI is finished first, then first send kill signal to updater, then this should automatically
 // be stopped/dropped anyways
@@ -42,11 +44,20 @@ impl Updater {
                     UpdaterCommand::UpdateSettings(new_settings) => {
                         self.update_settings = new_settings;
                     }
-                    UpdaterCommand::TogglePaused => {
-                        self.paused = !self.paused;
+                    UpdaterCommand::Pause => {
+                        self.paused = true;
+                    }
+                    UpdaterCommand::Unpause => {
+                        self.paused = false;
                     }
                     UpdaterCommand::SetFpsUpdateTime(update_time) => {
                         self.fps_update_time = update_time;
+                    }
+                    UpdaterCommand::AddObject(object) => {
+                        self.universe.add_object(object, ObjectColor::FromMass);
+                        if let Err(_) = self.update_send.send(self.universe.clone()) {
+                            return IterationResult::Finished;
+                        }
                     }
                 }
             },
@@ -75,8 +86,10 @@ impl Updater {
 
 pub enum UpdaterCommand {
     UpdateSettings(UpdateSettings),
-    TogglePaused,
+    Pause,
+    Unpause,
     SetFpsUpdateTime(f64),
+    AddObject(Object),
 }
 
 pub struct UpdateSettings {
@@ -90,5 +103,11 @@ impl Default for UpdateSettings {
             time: 30_000.,
             iterations: 100,
         }
+    }
+}
+
+impl UpdateSettings {
+    pub fn time(&self) -> f64 {
+        self.time
     }
 }
