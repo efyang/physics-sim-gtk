@@ -1,8 +1,9 @@
 use std::sync::mpsc::{channel, Sender, Receiver, TryRecvError};
 use coloruniverse::ColorUniverse;
 use iteration_result::IterationResult;
+//use physics_sim::Object;
+use physics_sim::*;
 use color::ObjectColor;
-use physics_sim::Object;
 
 // if UI is finished first, then first send kill signal to updater, then this should automatically
 // be stopped/dropped anyways
@@ -20,6 +21,11 @@ pub struct Updater {
 
 impl Updater {
     pub fn new(universe: ColorUniverse) -> (Updater, Receiver<ColorUniverse>, Sender<UpdaterCommand>) {
+        //let mut universe = universe.clone();
+        //universe.add_object(Object::new(200000., Vector::default(), Point::new(0., 0.)), ObjectColor::FromMass);
+        //universe.add_object(Object::new(10000., Vector::new(120., 0.), Point::new(0., 5000.)), ObjectColor::FromMass);
+        //universe.add_object(Object::new(1., Vector::new(53., 0.), Point::new(0., 140.)), ObjectColor::FromMass);
+
         let (update_send, update_recv) = channel();
         let (update_command_send, update_command_recv) = channel();
         (Updater {
@@ -53,11 +59,8 @@ impl Updater {
                     UpdaterCommand::SetFpsUpdateTime(update_time) => {
                         self.fps_update_time = update_time;
                     }
-                    UpdaterCommand::AddObject(object) => {
-                        self.universe.add_object(object, ObjectColor::FromMass);
-                        if let Err(_) = self.update_send.send(self.universe.clone()) {
-                            return IterationResult::Finished;
-                        }
+                    UpdaterCommand::SetUniverse(universe) => {
+                        self.universe = universe;
                     }
                 }
             },
@@ -89,7 +92,7 @@ pub enum UpdaterCommand {
     Pause,
     Unpause,
     SetFpsUpdateTime(f64),
-    AddObject(Object),
+    SetUniverse(ColorUniverse),
 }
 
 pub struct UpdateSettings {
@@ -100,7 +103,7 @@ pub struct UpdateSettings {
 impl Default for UpdateSettings {
     fn default() -> UpdateSettings {
         UpdateSettings {
-            time: 30_000.,
+            time: 3000.,
             iterations: 100,
         }
     }

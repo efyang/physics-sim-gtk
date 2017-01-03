@@ -14,8 +14,8 @@ impl Default for DrawInfo {
         DrawInfo {
             x_size: 800.,
             y_size: 800.,
-            x_scale: 0.08,
-            y_scale: 0.08,
+            x_scale: 0.7,
+            y_scale: 0.7,
             x_shift: 400.,
             y_shift: 400.,
         }

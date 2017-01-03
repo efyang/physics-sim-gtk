@@ -32,28 +32,8 @@ pub struct Ui {
 
 impl Ui {
     pub fn initialize() -> Ui {
-        let setup_tmp_universe = {
-            let mut universe = ColorUniverse::default();
-
-            universe.add_object(::physics_sim::Object::new(5_000_000.,
-                                                           ::physics_sim::Vector::new(0.001111, (-180f64).to_radians()),
-                                                           ::physics_sim::Point::new(0., 500.)),
-                                                           ::color::ObjectColor::FromMass);
-            universe.add_object(::physics_sim::Object::new(5_000_000.,
-                                                           ::physics_sim::Vector::new(0.001111, (-60f64).to_radians()),
-                                                           ::physics_sim::Point::new(-353.5539, -353.5539)),
-                                                           ::color::ObjectColor::FromMass);
-            universe.add_object(::physics_sim::Object::new(5_000_000.,
-                                                           ::physics_sim::Vector::new(0.001111, (60f64).to_radians()),
-                                                           ::physics_sim::Point::new(353.5539, -353.5539)),
-                                                           ::color::ObjectColor::FromMass);
-            universe
-        };
-
-        // let (mut updater, universe_recv, update_command_send) =
-        // Updater::new(ColorUniverse::default());
         let (mut updater, universe_recv, update_command_send) =
-            Updater::new(setup_tmp_universe.clone());
+            Updater::new(ColorUniverse::default());
 
         let window = default_window();
         let mainsplit = gtk::Box::new(Orientation::Vertical, 10);
@@ -68,8 +48,7 @@ impl Ui {
             fpsinfo: SharedState::new(FpsInfo::default()),
             state: SharedState::new(UiState::default()),
             drawarea: SharedState::new(drawarea),
-            // universe: SharedState::new(ColorUniverse::default()),
-            universe: SharedState::new(setup_tmp_universe),
+            universe: SharedState::new(ColorUniverse::default()),
             drawinfo: SharedState::new(DrawInfo::default()),
             universe_recv: SharedState::new(universe_recv),
             update_settings: SharedState::new(UpdateSettings::default()),
@@ -115,7 +94,8 @@ impl Ui {
             match *uistate.get_state() {
                 UiState::Edit(ref editstate) => {
                     let ref input_info = *input_info.get_state();
-                    let mouse_raw = drawinfo.get_state().get_actual_point(input_info.mouse_x, input_info.mouse_y);
+                    let mouse_raw = drawinfo.get_state()
+                        .get_actual_point(input_info.mouse_x, input_info.mouse_y);
                     let mouse = Point::new(mouse_raw.0, mouse_raw.1);
                     match *editstate {
                         EditState::Mouse(ref mouse_edit_state) => {
@@ -128,14 +108,19 @@ impl Ui {
                                 MouseEditState::SetMass(center_pt) => {
                                     let radius = mouse.distance_to(&center_pt);
                                     let mass = (radius.powi(3) * ::std::f64::consts::PI) / 0.75;
-                                    ctxt.arc(center_pt.x, center_pt.y, radius, 0., 2. * ::std::f64::consts::PI);
+                                    ctxt.arc(center_pt.x,
+                                             center_pt.y,
+                                             radius,
+                                             0.,
+                                             2. * ::std::f64::consts::PI);
                                     let color = mass_to_color(mass);
                                     ctxt.set_source_rgba(color.0, color.1, color.2, 0.4);
                                     ctxt.fill();
                                 }
                                 MouseEditState::SetVelocity(mass, center_pt) => {
                                     // draw object
-                                    let tmp_object = Object::new(mass, Vector::default(), center_pt);
+                                    let tmp_object =
+                                        Object::new(mass, Vector::default(), center_pt);
                                     tmp_object.draw(ctxt, &ObjectColor::FromMass);
 
                                     // draw potential velocity vector
@@ -215,33 +200,59 @@ impl Ui {
             let input_info = self.input_info.clone();
             let drawinfo = self.drawinfo.clone();
             let allow_mouse_movement = self.allow_mouse_movement.clone();
+            let universe = self.universe.clone();
+            let universe_recv = self.universe_recv.clone();
             window.connect_key_release_event(move |_, key| {
                 match key.get_keyval() {
                     key::P | key::p => {
                         let new_state = match *uistate.get_state() {
                             UiState::Paused => {
-                                update_command_send.get_state().send(UpdaterCommand::Unpause).unwrap();
+                                update_command_send.get_state()
+                                    .send(UpdaterCommand::Unpause)
+                                    .unwrap();
                                 UiState::Normal
-                            },
+                            }
                             _ => {
-                                update_command_send.get_state().send(UpdaterCommand::Pause).unwrap();
+                                update_command_send.get_state()
+                                    .send(UpdaterCommand::Pause)
+                                    .unwrap();
                                 UiState::Paused
-                            },
+                            }
                         };
                         *uistate.get_state_mut() = new_state;
                     }
                     key::E | key::e => {
                         let new_state = match *uistate.get_state() {
                             UiState::Edit(_) => {
-                                update_command_send.get_state().send(UpdaterCommand::Unpause).unwrap();
+                                update_command_send.get_state()
+                                    .send(UpdaterCommand::Unpause)
+                                    .unwrap();
                                 UiState::Normal
-                            },
+                            }
                             _ => {
-                                update_command_send.get_state().send(UpdaterCommand::Pause).unwrap();
+                                update_command_send.get_state()
+                                    .send(UpdaterCommand::Pause)
+                                    .unwrap();
                                 UiState::Edit(EditState::default())
-                            },
+                            }
                         };
                         *uistate.get_state_mut() = new_state;
+                    }
+                    key::R | key::r => {
+                        *universe.get_state_mut() = ColorUniverse::default();
+                        update_command_send.get_state_mut()
+                            .send(UpdaterCommand::SetUniverse(universe.get_state().clone()))
+                            .unwrap();
+                        // clear receiver
+                        let universe_recv = universe_recv.get_state();
+                        let mut clear = false;
+                        while !clear {
+                            match universe_recv.try_recv() {
+                                Ok(_) => {}
+                                Err(TryRecvError::Empty) => clear = true,
+                                Err(e) => println!("error: {:?}", e),
+                            }
+                        }
                     }
                     key::Shift_L | key::Shift_R => {
                         input_info.get_state_mut().shift = false;
@@ -300,16 +311,16 @@ impl Ui {
         let drawinfo = self.drawinfo.clone();
         let update_settings = self.update_settings.clone();
         let update_command_send = self.update_command_send.clone();
+        let universe = self.universe.clone();
         drawarea.connect_button_release_event(move |_, key| {
             let ref mut uistate = *uistate.get_state_mut();
             if let UiState::Edit(EditState::Mouse(ref mut mouse_edit_state)) = *uistate {
                 let ref input_info = *input_info.get_state();
-                let mouse_raw = drawinfo.get_state().get_actual_point(input_info.mouse_x, input_info.mouse_y);
+                let mouse_raw = drawinfo.get_state()
+                    .get_actual_point(input_info.mouse_x, input_info.mouse_y);
                 let mouse = Point::new(mouse_raw.0, mouse_raw.1);
                 *mouse_edit_state = match *mouse_edit_state {
-                    MouseEditState::SetPoint => {
-                        MouseEditState::SetMass(mouse)
-                    }
+                    MouseEditState::SetPoint => MouseEditState::SetMass(mouse),
                     MouseEditState::SetMass(point) => {
                         let radius = mouse.distance_to(&point);
                         let mass = (radius.powi(3) * ::std::f64::consts::PI) / 0.75;
@@ -320,10 +331,16 @@ impl Ui {
                         let x_dist = mouse.x - point.x;
                         let line_angle = y_dist.atan2(x_dist);
                         let distance = mouse.distance_to(&point);
-                        let v_magnitude = distance/(update_settings.get_state().time() * DEFAULT_FPS);
+                        let v_magnitude = distance /
+                                          (update_settings.get_state().time() * DEFAULT_FPS);
 
-                        let new_object = Object::new(mass, Vector::new(v_magnitude, line_angle), point);
-                        update_command_send.get_state_mut().send(UpdaterCommand::AddObject(new_object)).unwrap();
+                        let new_object =
+                            Object::new(mass, Vector::new(v_magnitude, line_angle), point);
+
+                        universe.get_state_mut().add_object(new_object, ObjectColor::FromMass);
+                        update_command_send.get_state_mut()
+                            .send(UpdaterCommand::SetUniverse(universe.get_state().clone()))
+                            .unwrap();
                         // go back to initial state
                         MouseEditState::SetPoint
                     }
@@ -407,16 +424,17 @@ impl Ui {
         // handle the mouse position (if its within borders then move view)
         let (x_size, y_size) = drawinfo.get_size();
         if allow_mouse_movement && input_info.mouse_within_any_side_border(x_size, y_size) {
+            let max_movement = 20.;
             let (mut x_trans, mut y_trans) = (0., 0.);
             if let Some(distance) = input_info.mouse_top_move_border(y_size) {
-                y_trans = 10. * (1. - distance/::keys::MOUSE_MOVEMENT_BORDER_WIDTH);
+                y_trans = max_movement * (1. - distance / ::keys::MOUSE_MOVEMENT_BORDER_WIDTH);
             } else if let Some(distance) = input_info.mouse_bottom_move_border(y_size) {
-                y_trans = -10. * (1. - distance/::keys::MOUSE_MOVEMENT_BORDER_WIDTH);
+                y_trans = -max_movement * (1. - distance / ::keys::MOUSE_MOVEMENT_BORDER_WIDTH);
             }
             if let Some(distance) = input_info.mouse_left_move_border(x_size) {
-                x_trans = 10. * (1. - distance/::keys::MOUSE_MOVEMENT_BORDER_WIDTH);
+                x_trans = max_movement * (1. - distance / ::keys::MOUSE_MOVEMENT_BORDER_WIDTH);
             } else if let Some(distance) = input_info.mouse_right_move_border(x_size) {
-                x_trans = -10. * (1. - distance/::keys::MOUSE_MOVEMENT_BORDER_WIDTH);
+                x_trans = -max_movement * (1. - distance / ::keys::MOUSE_MOVEMENT_BORDER_WIDTH);
             }
             drawinfo.translate(x_trans, y_trans);
         } else {
@@ -428,7 +446,7 @@ impl Ui {
             }
             if input_info.left {
                 drawinfo.translate(7.5, 0.);
-            } else if input_info.right{
+            } else if input_info.right {
                 drawinfo.translate(-7.5, 0.);
             }
         }
@@ -442,19 +460,40 @@ impl Ui {
         }
 
         // check the updater output
-        //match *self.state.get_state() {
-            //UiState::Paused | UiState::Edit(_) => {}
-            //_ => {
+        match *self.state.get_state_mut() {
+            UiState::Paused | UiState::Edit(_) => {
+                println!("paused");
+                // set the current universe
+                self.update_command_send
+                    .get_state_mut()
+                    .send(UpdaterCommand::SetUniverse(self.universe.get_state().clone()))
+                    .unwrap();
+                // clear the receiver
+                let mut clear = false;
+                let universe_recv = self.universe_recv.get_state();
+                while !clear {
+                    match universe_recv.try_recv() {
+                        Ok(_) => {}
+                        Err(TryRecvError::Empty) => clear = true,
+                        Err(e) => {
+                            // should never happen
+                            return IterationResult::Error(format!("{}", e));
+                        }
+                    }
+                }
+            }
+            _ => {
+                println!("not paused");
                 match self.universe_recv.get_state().try_recv() {
                     Ok(new_universe) => *self.universe.get_state_mut() = new_universe,
-                    Err(TryRecvError::Empty) => {},
+                    Err(TryRecvError::Empty) => {}
                     Err(e) => {
                         // should never happen
                         return IterationResult::Error(format!("{}", e));
                     }
                 }
-            //}
-        //}
+            }
+        }
 
         IterationResult::Ok
     }
