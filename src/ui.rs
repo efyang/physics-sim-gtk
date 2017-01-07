@@ -1,30 +1,23 @@
 use gtk::prelude::*;
 use gtk::{self, Window, WindowType, DrawingArea, Orientation};
-use coloruniverse::ColorUniverse;
-use uistate::UiState;
 use sharedstate::SharedState;
-use fpsinfo::*;
 use draw::*;
-use std::sync::mpsc::{Sender, Receiver, TryRecvError};
-use updater::{UpdateSettings, UpdaterCommand, Updater};
+use std::sync::mpsc::TryRecvError;
+use updater::{UpdaterCommand, Updater};
 use iteration_result::IterationResult;
-use input::{InputInfo, MOUSE_MOVEMENT_BORDER_WIDTH};
 use gdk::enums::key;
 use editstate::{EditState, MouseEditState};
 use physics_sim::{Object, Point, Vector};
 use color::{mass_to_color, ObjectColor};
+use uidata::UiData;
+use coloruniverse::ColorUniverse;
+use uistate::UiState;
+use input::MOUSE_MOVEMENT_BORDER_WIDTH;
+use fpsinfo::DEFAULT_FPS;
 
 pub struct Ui {
-    fpsinfo: SharedState<FpsInfo>,
-    state: SharedState<UiState>,
-    drawarea: SharedState<DrawingArea>,
-    universe: SharedState<ColorUniverse>,
-    drawinfo: SharedState<DrawInfo>,
-    universe_recv: SharedState<Receiver<ColorUniverse>>,
-    update_settings: SharedState<UpdateSettings>,
-    update_command_send: SharedState<Sender<UpdaterCommand>>,
-    input_info: SharedState<InputInfo>,
-    allow_mouse_movement: SharedState<bool>,
+    data: SharedState<UiData>,
+    draw_area: DrawingArea,
 }
 
 impl Ui {
@@ -34,29 +27,25 @@ impl Ui {
 
         let window = default_window();
         let mainsplit = gtk::Box::new(Orientation::Vertical, 10);
-        let drawarea = DrawingArea::new();
+        let draw_area = DrawingArea::new();
         let input_interface = gtk::Box::new(Orientation::Horizontal, 10);
-        mainsplit.pack_start(&drawarea, true, true, 0);
+        mainsplit.pack_start(&draw_area, true, true, 0);
         mainsplit.pack_end(&input_interface, false, true, 0);
         window.add(&mainsplit);
         window.show_all();
 
+        let data = UiData::new(universe_recv, update_command_send);
+
         let this = Ui {
-            fpsinfo: SharedState::new(FpsInfo::default()),
-            state: SharedState::new(UiState::default()),
-            drawarea: SharedState::new(drawarea),
-            universe: SharedState::new(ColorUniverse::default()),
-            drawinfo: SharedState::new(DrawInfo::default()),
-            universe_recv: SharedState::new(universe_recv),
-            update_settings: SharedState::new(UpdateSettings::default()),
-            update_command_send: SharedState::new(update_command_send),
-            input_info: SharedState::new(InputInfo::default()),
-            allow_mouse_movement: SharedState::new(true),
+            data: SharedState::new(data),
+            draw_area: draw_area,
         };
+
         this.setup_draw_callbacks();
         this.setup_mouse_callbacks();
         this.setup_key_callbacks(&window);
         this.setup_window_callbacks(&window);
+
         ::std::thread::spawn(move || {
             loop {
                 match updater.iterate() {
@@ -73,26 +62,21 @@ impl Ui {
     }
 
     fn setup_draw_callbacks(&self) {
-        let fpsinfo = self.fpsinfo.clone();
-        let universe = self.universe.clone();
-        let drawarea = self.drawarea.get_state();
-        let drawinfo = self.drawinfo.clone();
-        let uistate = self.state.clone();
-        let input_info = self.input_info.clone();
-        drawarea.set_size_request(800, 800);
-        drawarea.connect_draw(move |drawarea, ctxt| {
+        let data = self.data.clone();
+        self.draw_area.set_size_request(800, 800);
+        self.draw_area.connect_draw(move |_, ctxt| {
+            let ref mut data = *data.get_state_mut();
             // apply the drawing info
-            drawinfo.get_state_mut().apply(ctxt);
+            data.draw_info.apply(ctxt);
             // draw everything
-            universe.get_state().draw_all(ctxt);
+            data.universe.draw_all(ctxt);
             // draw the mode;
 
             // draw the edit information(if its in edit mode)
-            match *uistate.get_state() {
+            match data.state {
                 UiState::Edit(ref editstate) => {
-                    let ref input_info = *input_info.get_state();
-                    let mouse_raw = drawinfo.get_state()
-                        .get_actual_point(input_info.mouse_x, input_info.mouse_y);
+                    let mouse_raw = data.draw_info
+                        .get_actual_point(data.input_info.mouse_x, data.input_info.mouse_y);
                     let mouse = Point::new(mouse_raw.0, mouse_raw.1);
                     match *editstate {
                         EditState::Mouse(ref mouse_edit_state) => {
@@ -125,7 +109,7 @@ impl Ui {
                                     ctxt.move_to(center_pt.x, center_pt.y);
                                     ctxt.line_to(mouse.x, mouse.y);
                                     ctxt.set_source_rgba(1., 1., 1., 0.4);
-                                    ctxt.set_line_width(drawinfo.get_state().get_actual_width(3.));
+                                    ctxt.set_line_width(data.draw_info.get_actual_width(3.));
                                     ctxt.stroke();
                                     let y_dist = mouse.y - center_pt.y;
                                     let x_dist = mouse.x - center_pt.x;
@@ -135,7 +119,7 @@ impl Ui {
                                                     mouse.y,
                                                     line_angle,
                                                     30f64.to_radians(),
-                                                    drawinfo.get_state().get_actual_width(10.),
+                                                    data.draw_info.get_actual_width(10.),
                                                     1.,
                                                     1.,
                                                     1.,
@@ -150,36 +134,36 @@ impl Ui {
             }
 
             // get ready for next fps update
-            fpsinfo.get_state_mut().update_time();
+            data.fps_info.update_time();
             Inhibit(false)
         });
     }
 
     fn setup_key_callbacks(&self, window: &Window) {
-        let drawarea = self.drawarea.get_state();
-        drawarea.set_can_focus(true);
+        self.draw_area.set_can_focus(true);
 
         {
-            let input_info = self.input_info.clone();
+            let data = self.data.clone();
             window.connect_key_press_event(move |_, key| {
+                let ref mut data = *data.get_state_mut();
                 match key.get_keyval() {
                     key::Shift_L | key::Shift_R => {
-                        input_info.get_state_mut().shift = true;
+                        data.input_info.shift = true;
                     }
                     key::Control_L | key::Control_R => {
-                        input_info.get_state_mut().ctrl = true;
+                        data.input_info.ctrl = true;
                     }
                     key::Up => {
-                        input_info.get_state_mut().up = true;
+                        data.input_info.up = true;
                     }
                     key::Down => {
-                        input_info.get_state_mut().down = true;
+                        data.input_info.down = true;
                     }
                     key::Left => {
-                        input_info.get_state_mut().left = true;
+                        data.input_info.left = true;
                     }
                     key::Right => {
-                        input_info.get_state_mut().right = true;
+                        data.input_info.right = true;
                     }
                     _ => {
                         println!("keypressed");
@@ -191,59 +175,53 @@ impl Ui {
         }
 
         {
-            let update_command_send = self.update_command_send.clone();
-            let uistate = self.state.clone();
-            let input_info = self.input_info.clone();
-            let drawinfo = self.drawinfo.clone();
-            let allow_mouse_movement = self.allow_mouse_movement.clone();
-            let universe = self.universe.clone();
-            let universe_recv = self.universe_recv.clone();
+            let data = self.data.clone();
             window.connect_key_release_event(move |_, key| {
+                let ref mut data = *data.get_state_mut();
                 match key.get_keyval() {
                     key::P | key::p => {
-                        let new_state = match *uistate.get_state() {
+                        let new_state = match data.state {
                             UiState::Paused => {
-                                update_command_send.get_state()
+                                data.update_command_send
                                     .send(UpdaterCommand::Unpause)
                                     .unwrap();
                                 UiState::Normal
                             }
                             _ => {
-                                update_command_send.get_state()
+                                data.update_command_send
                                     .send(UpdaterCommand::Pause)
                                     .unwrap();
                                 UiState::Paused
                             }
                         };
-                        *uistate.get_state_mut() = new_state;
+                        data.state = new_state;
                     }
                     key::E | key::e => {
-                        let new_state = match *uistate.get_state() {
+                        let new_state = match data.state {
                             UiState::Edit(_) => {
-                                update_command_send.get_state()
+                                data.update_command_send
                                     .send(UpdaterCommand::Unpause)
                                     .unwrap();
                                 UiState::Normal
                             }
                             _ => {
-                                update_command_send.get_state()
+                                data.update_command_send
                                     .send(UpdaterCommand::Pause)
                                     .unwrap();
                                 UiState::Edit(EditState::default())
                             }
                         };
-                        *uistate.get_state_mut() = new_state;
+                        data.state = new_state;
                     }
                     key::R | key::r => {
-                        *universe.get_state_mut() = ColorUniverse::default();
-                        update_command_send.get_state_mut()
-                            .send(UpdaterCommand::SetUniverse(universe.get_state().clone()))
+                        data.universe = ColorUniverse::default();
+                        data.update_command_send
+                            .send(UpdaterCommand::SetUniverse(data.universe.clone()))
                             .unwrap();
                         // clear receiver
-                        let universe_recv = universe_recv.get_state();
                         let mut clear = false;
                         while !clear {
-                            match universe_recv.try_recv() {
+                            match data.universe_recv.try_recv() {
                                 Ok(_) => {}
                                 Err(TryRecvError::Empty) => clear = true,
                                 Err(e) => println!("error: {:?}", e),
@@ -251,34 +229,33 @@ impl Ui {
                         }
                     }
                     key::Shift_L | key::Shift_R => {
-                        input_info.get_state_mut().shift = false;
+                        data.input_info.shift = false;
                     }
                     key::Control_L | key::Control_R => {
-                        input_info.get_state_mut().ctrl = false;
+                        data.input_info.ctrl = false;
                     }
                     key::Up => {
-                        input_info.get_state_mut().up = false;
+                        data.input_info.up = false;
                     }
                     key::Down => {
-                        input_info.get_state_mut().down = false;
+                        data.input_info.down = false;
                     }
                     key::Left => {
-                        input_info.get_state_mut().left = false;
+                        data.input_info.left = false;
                     }
                     key::Right => {
-                        input_info.get_state_mut().right = false;
+                        data.input_info.right = false;
                     }
                     key::BackSpace => {
-                        let ref mut backspace = input_info.get_state_mut().backspace;
+                        let ref mut backspace = data.input_info.backspace;
                         backspace.next_state();
                         if backspace.should_reset() {
-                            drawinfo.get_state_mut().reset_view();
+                            data.draw_info.reset_view();
                             backspace.next_state();
                         }
                     }
                     key::M | key::m => {
-                        let new_allow = !*allow_mouse_movement.get_state();
-                        *allow_mouse_movement.get_state_mut() = new_allow;
+                        data.allow_mouse_movement = !data.allow_mouse_movement;
                     }
                     _ => {
                         println!("keypress");
@@ -290,30 +267,22 @@ impl Ui {
     }
 
     fn setup_mouse_callbacks(&self) {
-        let drawarea = self.drawarea.get_state();
+        self.draw_area.add_events(::gdk_sys::GDK_BUTTON_PRESS_MASK.bits() as i32);
+        self.draw_area.add_events(::gdk_sys::GDK_BUTTON_RELEASE_MASK.bits() as i32);
+        self.draw_area.add_events(::gdk_sys::GDK_SCROLL_MASK.bits() as i32);
+        self.draw_area.add_events(::gdk_sys::GDK_POINTER_MOTION_MASK.bits() as i32);
 
-        drawarea.add_events(::gdk_sys::GDK_BUTTON_PRESS_MASK.bits() as i32);
-        drawarea.add_events(::gdk_sys::GDK_BUTTON_RELEASE_MASK.bits() as i32);
-        drawarea.add_events(::gdk_sys::GDK_SCROLL_MASK.bits() as i32);
-        drawarea.add_events(::gdk_sys::GDK_POINTER_MOTION_MASK.bits() as i32);
-
-        drawarea.connect_button_press_event(|_, key| {
+        self.draw_area.connect_button_press_event(|_, key| {
             println!("mouse press");
             Inhibit(false)
         });
 
-        let uistate = self.state.clone();
-        let input_info = self.input_info.clone();
-        let drawinfo = self.drawinfo.clone();
-        let update_settings = self.update_settings.clone();
-        let update_command_send = self.update_command_send.clone();
-        let universe = self.universe.clone();
-        drawarea.connect_button_release_event(move |_, key| {
-            let ref mut uistate = *uistate.get_state_mut();
-            if let UiState::Edit(EditState::Mouse(ref mut mouse_edit_state)) = *uistate {
-                let ref input_info = *input_info.get_state();
-                let mouse_raw = drawinfo.get_state()
-                    .get_actual_point(input_info.mouse_x, input_info.mouse_y);
+        let data = self.data.clone();
+        self.draw_area.connect_button_release_event(move |_, key| {
+            let ref mut data = *data.get_state_mut();
+            if let UiState::Edit(EditState::Mouse(ref mut mouse_edit_state)) = data.state {
+                let mouse_raw = data.draw_info
+                    .get_actual_point(data.input_info.mouse_x, data.input_info.mouse_y);
                 let mouse = Point::new(mouse_raw.0, mouse_raw.1);
                 *mouse_edit_state = match *mouse_edit_state {
                     MouseEditState::SetPoint => MouseEditState::SetMass(mouse),
@@ -327,15 +296,14 @@ impl Ui {
                         let x_dist = mouse.x - point.x;
                         let line_angle = y_dist.atan2(x_dist);
                         let distance = mouse.distance_to(&point);
-                        let v_magnitude = distance /
-                                          (update_settings.get_state().time() * DEFAULT_FPS);
+                        let v_magnitude = distance / (data.update_settings.time() * DEFAULT_FPS);
 
                         let new_object =
                             Object::new(mass, Vector::new(v_magnitude, line_angle), point);
 
-                        universe.get_state_mut().add_object(new_object, ObjectColor::FromMass);
-                        update_command_send.get_state_mut()
-                            .send(UpdaterCommand::SetUniverse(universe.get_state().clone()))
+                        data.universe.add_object(new_object, ObjectColor::FromMass);
+                        data.update_command_send
+                            .send(UpdaterCommand::SetUniverse(data.universe.clone()))
                             .unwrap();
                         // go back to initial state
                         MouseEditState::SetPoint
@@ -347,29 +315,28 @@ impl Ui {
         });
 
         {
-            let drawinfo = self.drawinfo.clone();
-            let input_info = self.input_info.clone();
-            drawarea.connect_scroll_event(move |_, scroll| {
-                let ref input_info = *input_info.get_state();
+            let data = self.data.clone();
+            self.draw_area.connect_scroll_event(move |_, scroll| {
+                let ref mut data = *data.get_state_mut();
                 let (x, y) = scroll.get_position();
                 match scroll.as_ref().direction {
                     ::gdk_sys::GdkScrollDirection::Up => {
-                        if !(input_info.ctrl ^ input_info.shift) {
+                        if !(data.input_info.ctrl ^ data.input_info.shift) {
                             // either or none
-                            drawinfo.get_state_mut().scale(x, y, 1.01, 1.01);
-                        } else if input_info.ctrl {
-                            drawinfo.get_state_mut().scale(x, y, 1.01, 1.);
-                        } else if input_info.shift {
-                            drawinfo.get_state_mut().scale(x, y, 1., 1.01);
+                            data.draw_info.scale(x, y, 1.01, 1.01);
+                        } else if data.input_info.ctrl {
+                            data.draw_info.scale(x, y, 1.01, 1.);
+                        } else if data.input_info.shift {
+                            data.draw_info.scale(x, y, 1., 1.01);
                         }
                     }
                     ::gdk_sys::GdkScrollDirection::Down => {
-                        if !(input_info.ctrl ^ input_info.shift) {
-                            drawinfo.get_state_mut().scale(x, y, 0.99, 0.99);
-                        } else if input_info.ctrl {
-                            drawinfo.get_state_mut().scale(x, y, 0.99, 1.);
-                        } else if input_info.shift {
-                            drawinfo.get_state_mut().scale(x, y, 1., 0.99);
+                        if !(data.input_info.ctrl ^ data.input_info.shift) {
+                            data.draw_info.scale(x, y, 0.99, 0.99);
+                        } else if data.input_info.ctrl {
+                            data.draw_info.scale(x, y, 0.99, 1.);
+                        } else if data.input_info.shift {
+                            data.draw_info.scale(x, y, 1., 0.99);
                         }
                     }
                     _ => {}
@@ -379,12 +346,12 @@ impl Ui {
         }
 
         {
-            let input_info = self.input_info.clone();
-            drawarea.connect_motion_notify_event(move |_, motion| {
-                let ref mut input_info = *input_info.get_state_mut();
+            let data = self.data.clone();
+            self.draw_area.connect_motion_notify_event(move |_, motion| {
+                let ref mut data = *data.get_state_mut();
                 let (mx, my) = motion.get_position();
-                input_info.mouse_x = mx;
-                input_info.mouse_y = my;
+                data.input_info.mouse_x = mx;
+                data.input_info.mouse_y = my;
                 Inhibit(false)
             });
         }
@@ -396,16 +363,14 @@ impl Ui {
             Inhibit(false)
         });
 
-        let drawinfo = self.drawinfo.clone();
-        let drawarea = self.drawarea.clone();
-        window.connect_check_resize(move |_| {
-            // set the new size
-            let drawarea = drawarea.get_state();
-            let allocation_size = drawarea.get_allocation();
-            let (x_size, y_size) = (allocation_size.width, allocation_size.height);
-            drawinfo.get_state_mut().set_size(x_size as f64, y_size as f64);
-            drawarea.queue_draw();
-        });
+        // let data = self.data.clone();
+        // window.connect_check_resize(move |_| {
+        // set the new size
+        // let allocation_size = data.draw_area.get_allocation();
+        // let (x_size, y_size) = (allocation_size.width, allocation_size.height);
+        // data.draw_area.set_size(x_size as f64, y_size as f64);
+        // drawarea.queue_draw();
+        // );
     }
 
     // fn setup_button_callbacks(buttons: ) {
@@ -413,37 +378,36 @@ impl Ui {
     // }
 
     fn handle_input_iteration(&mut self) {
-        let input_info = self.input_info.get_state();
-        let ref mut drawinfo = *self.drawinfo.get_state_mut();
-        let allow_mouse_movement = *self.allow_mouse_movement.get_state();
+        let ref mut data = *self.data.get_state_mut();
 
         // handle the mouse position (if its within borders then move view)
-        let (x_size, y_size) = drawinfo.get_size();
-        if allow_mouse_movement && input_info.mouse_within_any_side_border(x_size, y_size) {
+        let (x_size, y_size) = data.draw_info.get_size();
+        if data.allow_mouse_movement &&
+           data.input_info.mouse_within_any_side_border(x_size, y_size) {
             let max_movement = 20.;
             let (mut x_trans, mut y_trans) = (0., 0.);
-            if let Some(distance) = input_info.mouse_top_move_border(y_size) {
+            if let Some(distance) = data.input_info.mouse_top_move_border(y_size) {
                 y_trans = max_movement * (1. - distance / MOUSE_MOVEMENT_BORDER_WIDTH);
-            } else if let Some(distance) = input_info.mouse_bottom_move_border(y_size) {
+            } else if let Some(distance) = data.input_info.mouse_bottom_move_border(y_size) {
                 y_trans = -max_movement * (1. - distance / MOUSE_MOVEMENT_BORDER_WIDTH);
             }
-            if let Some(distance) = input_info.mouse_left_move_border(x_size) {
+            if let Some(distance) = data.input_info.mouse_left_move_border(x_size) {
                 x_trans = max_movement * (1. - distance / MOUSE_MOVEMENT_BORDER_WIDTH);
-            } else if let Some(distance) = input_info.mouse_right_move_border(x_size) {
+            } else if let Some(distance) = data.input_info.mouse_right_move_border(x_size) {
                 x_trans = -max_movement * (1. - distance / MOUSE_MOVEMENT_BORDER_WIDTH);
             }
-            drawinfo.translate(x_trans, y_trans);
+            data.draw_info.translate(x_trans, y_trans);
         } else {
             // handle the arrow keys
-            if input_info.up {
-                drawinfo.translate(0., 7.5);
-            } else if input_info.down {
-                drawinfo.translate(0., -7.5);
+            if data.input_info.up {
+                data.draw_info.translate(0., 7.5);
+            } else if data.input_info.down {
+                data.draw_info.translate(0., -7.5);
             }
-            if input_info.left {
-                drawinfo.translate(7.5, 0.);
-            } else if input_info.right {
-                drawinfo.translate(-7.5, 0.);
+            if data.input_info.left {
+                data.draw_info.translate(7.5, 0.);
+            } else if data.input_info.right {
+                data.draw_info.translate(-7.5, 0.);
             }
         }
     }
@@ -451,23 +415,22 @@ impl Ui {
     pub fn iterate(&mut self) -> IterationResult {
         self.handle_input_iteration();
 
-        if self.fpsinfo.get_state().should_redraw() {
-            self.drawarea.get_state().queue_draw();
+        let ref mut data = *self.data.get_state_mut();
+        if data.fps_info.should_redraw() {
+            self.draw_area.queue_draw();
         }
 
         // check the updater output
-        match *self.state.get_state_mut() {
+        match data.state {
             UiState::Paused | UiState::Edit(_) => {
                 // set the current universe
-                self.update_command_send
-                    .get_state_mut()
-                    .send(UpdaterCommand::SetUniverse(self.universe.get_state().clone()))
+                data.update_command_send
+                    .send(UpdaterCommand::SetUniverse(data.universe.clone()))
                     .unwrap();
                 // clear the receiver
                 let mut clear = false;
-                let universe_recv = self.universe_recv.get_state();
                 while !clear {
-                    match universe_recv.try_recv() {
+                    match data.universe_recv.try_recv() {
                         Ok(_) => {}
                         Err(TryRecvError::Empty) => clear = true,
                         Err(e) => {
@@ -478,8 +441,8 @@ impl Ui {
                 }
             }
             _ => {
-                match self.universe_recv.get_state().try_recv() {
-                    Ok(new_universe) => *self.universe.get_state_mut() = new_universe,
+                match data.universe_recv.try_recv() {
+                    Ok(new_universe) => data.universe = new_universe,
                     Err(TryRecvError::Empty) => {}
                     Err(e) => {
                         // should never happen

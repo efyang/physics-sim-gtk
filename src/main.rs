@@ -19,6 +19,7 @@ mod coloruniverse;
 mod iteration_result;
 mod input;
 mod draw;
+mod uidata;
 
 use gtk::prelude::*;
 use ui::Ui;
