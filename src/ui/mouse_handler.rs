@@ -46,6 +46,19 @@ pub fn mouse_release_handler(data: &SharedState<UiData>, button: &EventButton) {
                 }
             }
         }
+        3 => {
+            if let UiState::Edit(EditState::Mouse(ref mut mouse_edit_state)) = data.state {
+                if let MouseEditState::SetVelocity(mass, point) = *mouse_edit_state {
+                    let new_object = Object::new(mass, Vector::default(), point);
+                    data.universe.add_object(new_object, ObjectColor::FromMass);
+                    data.update_command_send
+                        .send(UpdaterCommand::SetUniverse(data.universe.clone()))
+                        .unwrap();
+                    // go back to initial state
+                    *mouse_edit_state = MouseEditState::SetPoint
+                }
+            }
+        }
         _ => {}
     }
 }
