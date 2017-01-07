@@ -462,7 +462,6 @@ impl Ui {
         // check the updater output
         match *self.state.get_state_mut() {
             UiState::Paused | UiState::Edit(_) => {
-                println!("paused");
                 // set the current universe
                 self.update_command_send
                     .get_state_mut()
@@ -483,7 +482,6 @@ impl Ui {
                 }
             }
             _ => {
-                println!("not paused");
                 match self.universe_recv.get_state().try_recv() {
                     Ok(new_universe) => *self.universe.get_state_mut() = new_universe,
                     Err(TryRecvError::Empty) => {}

@@ -67,7 +67,6 @@ impl Updater {
             Err(TryRecvError::Empty) => {},
             Err(e) => return IterationResult::Error(format!("{}", e)),
         }
-
         // update the universe
         if !self.paused {
             self.universe
@@ -80,8 +79,11 @@ impl Updater {
         }
 
         let time_taken = ::time::precise_time_s() - start_time;
-        ::std::thread::sleep(::std::time::Duration::from_millis(((self.fps_update_time - time_taken) * 1000.) as u64));
-
+        // OVERFLOW
+        let time_sleep = self.fps_update_time - time_taken;
+        if time_sleep > 0. {
+            ::std::thread::sleep(::std::time::Duration::from_millis((time_sleep * 1000.) as u64));
+        }
         // continue
         IterationResult::Ok
     }
