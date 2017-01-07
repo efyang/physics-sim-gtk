@@ -1,5 +1,17 @@
 use physics_sim::Point;
 
+pub enum UiState {
+    Normal,
+    Edit(EditState),
+    Paused,
+}
+
+impl Default for UiState {
+    fn default() -> UiState {
+        UiState::Normal
+    }
+}
+
 pub enum EditState {
     Mouse(MouseEditState),
     Input,
@@ -22,5 +34,3 @@ impl Default for MouseEditState {
         MouseEditState::SetPoint
     }
 }
-
-// INCOMPLETE

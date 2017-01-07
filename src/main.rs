@@ -7,8 +7,6 @@ extern crate time;
 extern crate gdk_sys;
 extern crate gdk;
 
-mod uistate;
-mod editstate;
 mod ui;
 mod sharedstate;
 mod fpsinfo;
@@ -19,7 +17,6 @@ mod coloruniverse;
 mod iteration_result;
 mod input;
 mod draw;
-mod uidata;
 
 use gtk::prelude::*;
 use ui::Ui;

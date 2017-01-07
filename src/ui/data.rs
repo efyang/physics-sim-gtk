@@ -1,4 +1,4 @@
-use uistate::UiState;
+use super::state::UiState;
 use updater::{UpdateSettings, UpdaterCommand};
 use coloruniverse::ColorUniverse;
 use input::InputInfo;
