@@ -1,5 +1,6 @@
 use cairo::Context;
-use color::Color;
+mod info;
+mod traits;
 
 pub fn draw_arrow_head(ctxt: &Context,
                        head_x: f64,
@@ -11,10 +12,10 @@ pub fn draw_arrow_head(ctxt: &Context,
                        g: f64,
                        b: f64,
                        a: f64) {
-    let angle_1 = (line_angle + ::std::f64::consts::PI + head_angle);
+    let angle_1 = line_angle + ::std::f64::consts::PI + head_angle;
     let (s1, c1) = angle_1.sin_cos();
     let (x1, y1) = (head_x + head_length * c1, head_y + head_length * s1);
-    let angle_2 = (line_angle + ::std::f64::consts::PI - head_angle);
+    let angle_2 = line_angle + ::std::f64::consts::PI - head_angle;
     let (s2, c2) = angle_2.sin_cos();
     let (x2, y2) = (head_x + head_length * c2, head_y + head_length * s2);
     ctxt.new_path();
@@ -24,3 +25,7 @@ pub fn draw_arrow_head(ctxt: &Context,
     ctxt.set_source_rgba(r, g, b, a);
     ctxt.fill();
 }
+
+pub use self::info::DrawInfo as DrawInfo;
+pub use self::traits::DrawAll as DrawAll;
+pub use self::traits::Draw as Draw;

@@ -1,5 +1,4 @@
-use physics_sim::{Object, Universe};
-use cairo::prelude::*;
+use physics_sim::Object;
 use cairo::Context;
 use color::{ObjectColor, mass_to_color};
 use coloruniverse::ColorUniverse;
@@ -32,10 +31,14 @@ impl Draw for Object {
             ObjectColor::FromMass => {
                 ctmp = mass_to_color(self.mass());
                 &ctmp
-            },
+            }
         };
 
-        ctxt.arc(self.position().x, self.position().y, self.radius(), 0., 2. * ::std::f64::consts::PI);
+        ctxt.arc(self.position().x,
+                 self.position().y,
+                 self.radius(),
+                 0.,
+                 2. * ::std::f64::consts::PI);
         color_func!(ctxt, set_source_rgb, color);
         ctxt.fill();
     }

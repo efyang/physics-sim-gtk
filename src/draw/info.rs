@@ -1,4 +1,4 @@
-use cairo::{Context, Matrix, MatrixTrait};
+use cairo::Context;
 
 pub struct DrawInfo {
     x_size: f64,
@@ -76,5 +76,3 @@ impl DrawInfo {
         };
     }
 }
-
-// INCOMPLETE

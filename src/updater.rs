@@ -1,14 +1,6 @@
 use std::sync::mpsc::{channel, Sender, Receiver, TryRecvError};
 use coloruniverse::ColorUniverse;
 use iteration_result::IterationResult;
-//use physics_sim::Object;
-use physics_sim::*;
-use color::ObjectColor;
-
-// if UI is finished first, then first send kill signal to updater, then this should automatically
-// be stopped/dropped anyways
-
-// add should_update variable or receiver which should be false when uistate is edit
 
 pub struct Updater {
     update_send: Sender<ColorUniverse>,

@@ -1,21 +1,18 @@
 use gtk::prelude::*;
 use gtk::{self, Window, WindowType, DrawingArea, Orientation};
-use cairo::prelude::*;
 use coloruniverse::ColorUniverse;
 use uistate::UiState;
 use sharedstate::SharedState;
 use fpsinfo::*;
-use drawinfo::DrawInfo;
-use drawobject::{Draw, DrawAll};
+use draw::*;
 use std::sync::mpsc::{Sender, Receiver, TryRecvError};
 use updater::{UpdateSettings, UpdaterCommand, Updater};
 use iteration_result::IterationResult;
-use keys::InputInfo;
+use input::{InputInfo, MOUSE_MOVEMENT_BORDER_WIDTH};
 use gdk::enums::key;
 use editstate::{EditState, MouseEditState};
 use physics_sim::{Object, Point, Vector};
 use color::{mass_to_color, ObjectColor};
-use draw::draw_arrow_head;
 
 pub struct Ui {
     fpsinfo: SharedState<FpsInfo>,
@@ -164,7 +161,6 @@ impl Ui {
 
         {
             let input_info = self.input_info.clone();
-            let drawinfo = self.drawinfo.clone();
             window.connect_key_press_event(move |_, key| {
                 match key.get_keyval() {
                     key::Shift_L | key::Shift_R => {
@@ -427,14 +423,14 @@ impl Ui {
             let max_movement = 20.;
             let (mut x_trans, mut y_trans) = (0., 0.);
             if let Some(distance) = input_info.mouse_top_move_border(y_size) {
-                y_trans = max_movement * (1. - distance / ::keys::MOUSE_MOVEMENT_BORDER_WIDTH);
+                y_trans = max_movement * (1. - distance / MOUSE_MOVEMENT_BORDER_WIDTH);
             } else if let Some(distance) = input_info.mouse_bottom_move_border(y_size) {
-                y_trans = -max_movement * (1. - distance / ::keys::MOUSE_MOVEMENT_BORDER_WIDTH);
+                y_trans = -max_movement * (1. - distance / MOUSE_MOVEMENT_BORDER_WIDTH);
             }
             if let Some(distance) = input_info.mouse_left_move_border(x_size) {
-                x_trans = max_movement * (1. - distance / ::keys::MOUSE_MOVEMENT_BORDER_WIDTH);
+                x_trans = max_movement * (1. - distance / MOUSE_MOVEMENT_BORDER_WIDTH);
             } else if let Some(distance) = input_info.mouse_right_move_border(x_size) {
-                x_trans = -max_movement * (1. - distance / ::keys::MOUSE_MOVEMENT_BORDER_WIDTH);
+                x_trans = -max_movement * (1. - distance / MOUSE_MOVEMENT_BORDER_WIDTH);
             }
             drawinfo.translate(x_trans, y_trans);
         } else {

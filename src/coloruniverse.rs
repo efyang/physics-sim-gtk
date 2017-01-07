@@ -4,7 +4,7 @@ use super::color::ObjectColor;
 #[derive(Clone)]
 pub struct ColorUniverse {
     universe: Universe,
-    colors: Vec<ObjectColor>
+    colors: Vec<ObjectColor>,
 }
 
 impl Default for ColorUniverse {
@@ -21,7 +21,8 @@ impl ColorUniverse {
         self.universe.objects()
     }
 
-    pub fn object_mapped_colors<'a>(&'a self) -> impl Iterator<Item=(&'a Object, &'a ObjectColor)> {
+    pub fn object_mapped_colors<'a>(&'a self)
+                                    -> impl Iterator<Item = (&'a Object, &'a ObjectColor)> {
         self.universe.objects().iter().zip(self.colors.iter())
     }
 

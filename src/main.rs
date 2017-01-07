@@ -14,12 +14,10 @@ mod sharedstate;
 mod fpsinfo;
 #[macro_use]
 mod color;
-mod drawinfo;
-mod drawobject;
 mod updater;
 mod coloruniverse;
 mod iteration_result;
-mod keys;
+mod input;
 mod draw;
 
 use gtk::prelude::*;
@@ -37,11 +35,11 @@ fn main() {
             IterationResult::Ok => {}
             IterationResult::Finished => {
                 continue_state = false;
-            },
+            }
             IterationResult::Error(message) => {
                 continue_state = false;
                 println!("ERROR: {:?}", message);
-            },
+            }
         }
         Continue(continue_state)
     });

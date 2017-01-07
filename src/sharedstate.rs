@@ -7,9 +7,7 @@ pub struct SharedState<T> {
 
 impl<T> SharedState<T> {
     pub fn new(var: T) -> SharedState<T> {
-        SharedState {
-            inner: Rc::new(RefCell::new(var))
-        }
+        SharedState { inner: Rc::new(RefCell::new(var)) }
     }
 
     pub fn get_state(&self) -> Ref<T> {
@@ -27,8 +25,6 @@ impl<T> SharedState<T> {
 
 impl<T> Clone for SharedState<T> {
     fn clone(&self) -> SharedState<T> {
-        SharedState {
-            inner: self.inner.clone()
-        }
+        SharedState { inner: self.inner.clone() }
     }
 }

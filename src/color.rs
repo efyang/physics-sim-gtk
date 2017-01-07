@@ -20,14 +20,13 @@ impl Into<ObjectColor> for Color {
     }
 }
 
-const COLOR_MOD: usize = 3_000_000_000;
+const COLOR_MOD: usize = 300_000_000;
 const COLOR_SEGMENT: usize = COLOR_MOD / 6;
 pub fn mass_to_color(mass: f64) -> Color {
     let mmass = mass as usize % COLOR_MOD;
-    let fmmass = mmass as f64;
     let (r, b, g);
     // setup blue
-    if mmass >= 0 && mmass < COLOR_SEGMENT {
+    if mmass < COLOR_SEGMENT {
         r = 255;
         g = 51 + (255 - 51) * (mmass / COLOR_SEGMENT);
         b = 51;
