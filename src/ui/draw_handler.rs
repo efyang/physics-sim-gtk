@@ -3,7 +3,8 @@ use sharedstate::SharedState;
 use physics_sim::Vector;
 use draw::*;
 use color::*;
-
+use std::collections::VecDeque;
+use coloruniverse::CapVecDeque;
 use super::data::UiData;
 use super::state::*;
 use physics_sim::*;
@@ -19,7 +20,7 @@ pub fn draw_handler(data: &SharedState<UiData>, ctxt: &Context) {
     // draw grid
     data.draw_info.draw_grid(ctxt);
     // draw everything
-    data.universe.draw_all(ctxt);
+    data.universe.draw_all(ctxt, &data.draw_info);
     // draw the mode
 
     // draw the edit information(if its in edit mode)
@@ -51,7 +52,7 @@ pub fn draw_handler(data: &SharedState<UiData>, ctxt: &Context) {
                         MouseEditState::SetVelocity(mass, center_pt) => {
                             // draw object
                             let tmp_object = Object::new(mass, Vector::default(), center_pt);
-                            tmp_object.draw(ctxt, &ObjectColor::FromMass);
+                            tmp_object.draw(ctxt, &data.draw_info, &ObjectColor::FromMass, &CapVecDeque::new());
 
                             // draw potential velocity vector
                             ctxt.new_path();
