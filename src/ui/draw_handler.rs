@@ -10,11 +10,17 @@ use physics_sim::*;
 
 pub fn draw_handler(data: &SharedState<UiData>, ctxt: &Context) {
     let ref mut data = *data.get_state_mut();
+    // draw background
+    ctxt.set_operator(::cairo::Operator::Source);
+    ctxt.set_source_rgb(0.0, 0.0, 0.0);
+    ctxt.paint();
     // apply the drawing info
     data.draw_info.apply(ctxt);
+    // draw grid
+    data.draw_info.draw_grid(ctxt);
     // draw everything
     data.universe.draw_all(ctxt);
-    // draw the mode;
+    // draw the mode
 
     // draw the edit information(if its in edit mode)
     match data.state {

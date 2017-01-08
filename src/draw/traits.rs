@@ -9,10 +9,6 @@ pub trait DrawAll {
 
 impl DrawAll for ColorUniverse {
     fn draw_all(&self, ctxt: &Context) {
-        ctxt.set_operator(::cairo::Operator::Source);
-        ctxt.set_source_rgb(0.0, 0.0, 0.0);
-        ctxt.paint();
-
         for (object, color) in self.object_mapped_colors() {
             object.draw(ctxt, color);
         }

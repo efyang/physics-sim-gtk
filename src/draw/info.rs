@@ -7,6 +7,7 @@ pub struct DrawInfo {
     y_scale: f64,
     x_shift: f64,
     y_shift: f64,
+    draw_grid: bool,
 }
 
 impl Default for DrawInfo {
@@ -18,6 +19,7 @@ impl Default for DrawInfo {
             y_scale: 0.1,
             x_shift: 400.,
             y_shift: 400.,
+            draw_grid: true,
         }
     }
 }
@@ -75,4 +77,51 @@ impl DrawInfo {
             ..DrawInfo::default()
         };
     }
+
+    pub fn toggle_grid(&mut self) {
+        self.draw_grid = !self.draw_grid;
+    }
+
+    pub fn draw_grid(&self, ctxt: &Context) {
+        if self.draw_grid {
+            ctxt.set_source_rgba(1., 1., 1., 0.7);
+            ctxt.set_line_width(self.get_actual_width(0.3));
+
+            let (min_x, min_y) = self.get_actual_point(0., 0.);
+            let (max_x, max_y) = self.get_actual_point(self.x_size, self.y_size);
+            let x_range_min = (min_x / GRID_SPACING).ceil() as isize;
+            let x_range_max = (max_x / GRID_SPACING).floor() as isize;
+            let y_range_min = (min_y / GRID_SPACING).ceil() as isize;
+            let y_range_max = (max_y / GRID_SPACING).floor() as isize;
+            for x in (x_range_min..x_range_max + 1).map(|x| x as f64 * GRID_SPACING) {
+                if x == 0. {
+                    ctxt.stroke();
+                    ctxt.move_to(x, min_y);
+                    ctxt.line_to(x, max_y);
+                    ctxt.set_line_width(self.get_actual_width(1.));
+                    ctxt.stroke();
+                    ctxt.set_line_width(self.get_actual_width(0.3));
+                } else {
+                    ctxt.move_to(x, min_y);
+                    ctxt.line_to(x, max_y);
+                }
+            }
+            for y in (y_range_min..y_range_max + 1).map(|y| y as f64 * GRID_SPACING) {
+                if y == 0. {
+                    ctxt.stroke();
+                    ctxt.move_to(min_x, y);
+                    ctxt.line_to(max_x, y);
+                    ctxt.set_line_width(self.get_actual_width(1.));
+                    ctxt.stroke();
+                    ctxt.set_line_width(self.get_actual_width(0.3));
+                } else {
+                    ctxt.move_to(min_x, y);
+                    ctxt.line_to(max_x, y);
+                }
+            }
+            ctxt.stroke();
+        }
+    }
 }
+
+const GRID_SPACING: f64 = 1000.;

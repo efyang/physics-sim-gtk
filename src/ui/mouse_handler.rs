@@ -46,7 +46,7 @@ pub fn mouse_release_handler(data: &SharedState<UiData>, button: &EventButton) {
                 }
             }
         }
-        3 => {
+        2 => {
             if let UiState::Edit(EditState::Mouse(ref mut mouse_edit_state)) = data.state {
                 if let MouseEditState::SetVelocity(mass, point) = *mouse_edit_state {
                     let new_object = Object::new(mass, Vector::default(), point);
@@ -59,7 +59,14 @@ pub fn mouse_release_handler(data: &SharedState<UiData>, button: &EventButton) {
                 }
             }
         }
-        _ => {}
+        3 => {
+
+        }
+        _ => {
+            if let UiState::Edit(EditState::Mouse(ref mut mouse_edit_state)) = data.state {
+                *mouse_edit_state = MouseEditState::SetPoint;
+            }
+        }
     }
 }
 

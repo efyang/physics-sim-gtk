@@ -38,6 +38,9 @@ pub fn key_press_handler(data: &SharedState<UiData>, key: &EventKey) {
 pub fn key_release_handler(data: &SharedState<UiData>, key: &EventKey) {
     let ref mut data = *data.get_state_mut();
     match key.get_keyval() {
+        key::G | key::g => {
+            data.draw_info.toggle_grid();
+        }
         key::P | key::p => {
             let new_state = match data.state {
                 UiState::Paused => {

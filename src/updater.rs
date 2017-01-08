@@ -2,6 +2,8 @@ use std::sync::mpsc::{channel, Sender, Receiver, TryRecvError};
 use coloruniverse::ColorUniverse;
 use iteration_result::IterationResult;
 
+pub const UNIVERSE_CACHE_LIMIT: usize = 100;
+
 pub struct Updater {
     update_send: Sender<ColorUniverse>,
     update_command_recv: Receiver<UpdaterCommand>,
@@ -9,6 +11,8 @@ pub struct Updater {
     universe: ColorUniverse,
     paused: bool,
     fps_update_time: f64,
+    consumption_count: isize,
+    cache_fill: usize,
 }
 
 impl Updater {
@@ -27,6 +31,8 @@ impl Updater {
             universe: universe,
             paused: false,
             fps_update_time: 1./60.,
+            consumption_count: 0,
+            cache_fill: 0,
         },
         update_recv,
         update_command_send)
@@ -47,6 +53,8 @@ impl Updater {
                     }
                     UpdaterCommand::Unpause => {
                         self.paused = false;
+                        self.consumption_count = 0;
+                        self.cache_fill = 0;
                     }
                     UpdaterCommand::SetFpsUpdateTime(update_time) => {
                         self.fps_update_time = update_time;
@@ -54,13 +62,16 @@ impl Updater {
                     UpdaterCommand::SetUniverse(universe) => {
                         self.universe = universe;
                     }
+                    UpdaterCommand::UniverseConsumed => {
+                        self.consumption_count += 1;
+                    }
                 }
             },
             Err(TryRecvError::Empty) => {},
             Err(e) => return IterationResult::Error(format!("{}", e)),
         }
         // update the universe
-        if !self.paused {
+        if !self.paused && (self.cache_fill < UNIVERSE_CACHE_LIMIT || self.consumption_count > 0) {
             self.universe
                 .update_state_repeat(self.update_settings.time, self.update_settings.iterations);
 
@@ -68,10 +79,14 @@ impl Updater {
             if let Err(_) = self.update_send.send(self.universe.clone()) {
                 return IterationResult::Finished;
             }
+            if self.cache_fill < UNIVERSE_CACHE_LIMIT {
+                self.cache_fill += 1;
+            } else {
+                self.consumption_count -= 1;
+            }
         }
 
         let time_taken = ::time::precise_time_s() - start_time;
-        // OVERFLOW
         let time_sleep = self.fps_update_time - time_taken;
         if time_sleep > 0. {
             ::std::thread::sleep(::std::time::Duration::from_millis((time_sleep * 1000.) as u64));
@@ -87,6 +102,7 @@ pub enum UpdaterCommand {
     Unpause,
     SetFpsUpdateTime(f64),
     SetUniverse(ColorUniverse),
+    UniverseConsumed,
 }
 
 pub struct UpdateSettings {

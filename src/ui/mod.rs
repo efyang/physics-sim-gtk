@@ -220,7 +220,11 @@ impl Ui {
             }
             _ => {
                 match data.universe_recv.try_recv() {
-                    Ok(new_universe) => data.universe = new_universe,
+                    Ok(new_universe) => {
+                        data.universe = new_universe;
+                        // tell the updater it has consumed a state
+                        data.update_command_send.send(UpdaterCommand::UniverseConsumed).unwrap();
+                    }
                     Err(TryRecvError::Empty) => {}
                     Err(e) => {
                         // should never happen
