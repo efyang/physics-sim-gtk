@@ -84,8 +84,8 @@ impl DrawInfo {
 
     pub fn draw_grid(&self, ctxt: &Context) {
         if self.draw_grid {
-            ctxt.set_source_rgba(1., 1., 1., 0.7);
-            ctxt.set_line_width(self.get_actual_width(0.3));
+            ctxt.set_source_rgba(1., 1., 1., 0.5);
+            ctxt.set_line_width(self.get_actual_width(0.5));
 
             let (min_x, min_y) = self.get_actual_point(0., 0.);
             let (max_x, max_y) = self.get_actual_point(self.x_size, self.y_size);
@@ -98,9 +98,9 @@ impl DrawInfo {
                     ctxt.stroke();
                     ctxt.move_to(x, min_y);
                     ctxt.line_to(x, max_y);
-                    ctxt.set_line_width(self.get_actual_width(1.));
+                    ctxt.set_line_width(self.get_actual_width(1.2));
                     ctxt.stroke();
-                    ctxt.set_line_width(self.get_actual_width(0.3));
+                    ctxt.set_line_width(self.get_actual_width(0.5));
                 } else {
                     ctxt.move_to(x, min_y);
                     ctxt.line_to(x, max_y);
@@ -111,9 +111,9 @@ impl DrawInfo {
                     ctxt.stroke();
                     ctxt.move_to(min_x, y);
                     ctxt.line_to(max_x, y);
-                    ctxt.set_line_width(self.get_actual_width(1.));
+                    ctxt.set_line_width(self.get_actual_width(1.2));
                     ctxt.stroke();
-                    ctxt.set_line_width(self.get_actual_width(0.3));
+                    ctxt.set_line_width(self.get_actual_width(0.5));
                 } else {
                     ctxt.move_to(min_x, y);
                     ctxt.line_to(max_x, y);
