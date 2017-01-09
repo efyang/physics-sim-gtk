@@ -32,7 +32,11 @@ impl Ui {
         let window = default_window();
         let mainsplit = gtk::Box::new(Orientation::Vertical, 10);
         let draw_area = DrawingArea::new();
-        let input_interface = gtk::Box::new(Orientation::Horizontal, 10);
+        let input_interface = gtk::Box::new(Orientation::Vertical, 10);
+        let time_scale = gtk::Scale::new_with_range(Orientation::Horizontal, 1., 100_000., 1000.);
+        let accuracy_scale = gtk::Scale::new_with_range(Orientation::Horizontal, 1., 100_000., 1000.);
+        input_interface.add(&time_scale);
+        input_interface.add(&accuracy_scale);
         mainsplit.pack_start(&draw_area, true, true, 0);
         mainsplit.pack_end(&input_interface, false, true, 0);
         window.add(&mainsplit);
