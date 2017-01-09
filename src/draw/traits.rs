@@ -10,18 +10,25 @@ pub trait DrawAll {
 
 impl DrawAll for ColorUniverse {
     fn draw_all(&self, ctxt: &Context, info: &DrawInfo) {
-        for (object, color, positions) in self.object_mapped() {
-            object.draw(ctxt, info, color, positions);
+        if info.draw_paths() {
+            for (object, color, positions) in self.object_mapped() {
+                object.draw_path(ctxt, info, color, positions);
+            }
+        }
+
+        for (object, color, _) in self.object_mapped() {
+            object.draw(ctxt, info, color);
         }
     }
 }
 
 pub trait Draw {
-    fn draw(&self, &Context, &DrawInfo, &ObjectColor, positions: &CapVecDeque);
+    fn draw(&self, &Context, &DrawInfo, &ObjectColor);
+    fn draw_path(&self, &Context, &DrawInfo, &ObjectColor, &CapVecDeque);
 }
 
 impl Draw for Object {
-    fn draw(&self, ctxt: &Context, info: &DrawInfo, color: &ObjectColor, positions: &CapVecDeque) {
+    fn draw(&self, ctxt: &Context, info: &DrawInfo, color: &ObjectColor) {
         let ctmp;
         let color = match *color {
             ObjectColor::UserSet(ref c) => c,
@@ -32,12 +39,6 @@ impl Draw for Object {
         };
         color_func!(ctxt, set_source_rgb, color);
 
-        ctxt.set_line_width(info.get_actual_width(1.));
-        // draw the path
-        let current = self.position();
-        draw_positions(&self.position(), ctxt, positions);
-        ctxt.stroke();
-
         // draw the object
         ctxt.arc(self.position().x,
                  self.position().y,
@@ -45,6 +46,35 @@ impl Draw for Object {
                  0.,
                  2. * ::std::f64::consts::PI);
         ctxt.fill();
+        ctxt.arc(self.position().x,
+                 self.position().y,
+                 self.radius(),
+                 0.,
+                 2. * ::std::f64::consts::PI);
+        ctxt.set_source_rgb(1., 1., 1.);
+        ctxt.set_line_width(info.get_actual_width(2.));
+        ctxt.stroke();
+    }
+
+    fn draw_path(&self,
+                 ctxt: &Context,
+                 info: &DrawInfo,
+                 color: &ObjectColor,
+                 positions: &CapVecDeque) {
+        let ctmp;
+        let color = match *color {
+            ObjectColor::UserSet(ref c) => c,
+            ObjectColor::FromMass => {
+                ctmp = mass_to_color(self.mass());
+                &ctmp
+            }
+        };
+        color_func!(ctxt, set_source_rgb, color);
+        // draw the path
+        let current = self.position();
+        ctxt.set_line_width(info.get_actual_width(1.));
+        draw_positions(&self.position(), ctxt, positions);
+        ctxt.stroke();
     }
 }
 

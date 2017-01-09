@@ -31,7 +31,7 @@ impl UiData {
             update_settings: UpdateSettings::default(),
             update_command_send: update_command_send,
             input_info: InputInfo::default(),
-            allow_mouse_movement: true,
+            allow_mouse_movement: false,
         }
     }
 }

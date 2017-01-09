@@ -52,7 +52,7 @@ pub fn draw_handler(data: &SharedState<UiData>, ctxt: &Context) {
                         MouseEditState::SetVelocity(mass, center_pt) => {
                             // draw object
                             let tmp_object = Object::new(mass, Vector::default(), center_pt);
-                            tmp_object.draw(ctxt, &data.draw_info, &ObjectColor::FromMass, &CapVecDeque::new());
+                            tmp_object.draw(ctxt, &data.draw_info, &ObjectColor::FromMass);
 
                             // draw potential velocity vector
                             ctxt.new_path();

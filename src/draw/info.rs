@@ -8,6 +8,7 @@ pub struct DrawInfo {
     x_shift: f64,
     y_shift: f64,
     draw_grid: bool,
+    draw_paths: bool,
 }
 
 impl Default for DrawInfo {
@@ -20,6 +21,7 @@ impl Default for DrawInfo {
             x_shift: 400.,
             y_shift: 400.,
             draw_grid: true,
+            draw_paths: true,
         }
     }
 }
@@ -80,6 +82,14 @@ impl DrawInfo {
 
     pub fn toggle_grid(&mut self) {
         self.draw_grid = !self.draw_grid;
+    }
+
+    pub fn toggle_paths(&mut self) {
+        self.draw_paths = !self.draw_paths;
+    }
+
+    pub fn draw_paths(&self) -> bool {
+        self.draw_paths
     }
 
     pub fn draw_grid(&self, ctxt: &Context) {

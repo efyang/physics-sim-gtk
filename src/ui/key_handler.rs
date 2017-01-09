@@ -119,6 +119,9 @@ pub fn key_release_handler(data: &SharedState<UiData>, key: &EventKey) {
         key::M | key::m => {
             data.allow_mouse_movement = !data.allow_mouse_movement;
         }
+        key::D | key::d => {
+            data.draw_info.toggle_paths();
+        }
         _ => {
             println!("keypress");
         }

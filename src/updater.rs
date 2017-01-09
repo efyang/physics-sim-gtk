@@ -2,7 +2,7 @@ use std::sync::mpsc::{channel, Sender, Receiver, TryRecvError};
 use coloruniverse::ColorUniverse;
 use iteration_result::IterationResult;
 
-pub const UNIVERSE_CACHE_LIMIT: usize = 100;
+pub const UNIVERSE_CACHE_LIMIT: usize = 10;
 
 pub struct Updater {
     update_send: Sender<ColorUniverse>,
